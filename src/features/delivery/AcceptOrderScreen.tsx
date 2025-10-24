@@ -28,12 +28,7 @@ import Haptic from 'react-native-haptic-feedback';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
 import Geolocation from '@react-native-community/geolocation';
-import {
-  getCurrentLocation,
-  watchLocation,
-  clearLocationWatch,
-} from '@service/directionsService';
-import type {DriverLocation} from '@model/Location.model';
+import {watchLocation, clearLocationWatch} from '@service/directionsService';
 
 Geolocation.setRNConfiguration?.({
   skipPermissionRequests: false,
@@ -184,8 +179,15 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   }, [slideAnim, fadeAnim, scaleAnim, isAnimating, triggerHaptic]);
 
   const onAccept = useCallback(async () => {
+    console.log(
+      'onAccept called - accepted:',
+      accepted,
+      'isAnimating:',
+      isAnimating,
+    );
     if (accepted || isAnimating) return;
     setAccepted(true);
+    console.log('Order accepted, starting navigation process...');
     // Enhanced success haptic feedback
     triggerHaptic('success');
     Vibration.vibrate([0, 50, 100, 50, 100]);
@@ -224,6 +226,29 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     // simulate API call with better timing
     setTimeout(() => {
       slideDownOrderUI();
+      // Navigate to PickupNavigation screen after accepting order
+      setTimeout(() => {
+        console.log('Attempting to navigate to PickupNavigation...');
+        console.log('Navigation object:', navigation);
+        console.log('Driver location:', driverLocation);
+
+        if (navigation) {
+          navigation.navigate('PickupNavigation', {
+            pickupLocation: {
+              latitude: 17.43869444638263,
+              longitude: 78.39538337328888,
+              name: 'SuperStart Golisoda Madhapur',
+              address: 'Plot 59, Guttala Begumpet, Madhapur, Hyderabad',
+              phoneNumber: '+91-9876543210',
+            },
+            driverLocation: driverLocation,
+            orderId: 'ORDER_' + Date.now(),
+          });
+          console.log('Navigation call completed');
+        } else {
+          console.log('Navigation object is null/undefined');
+        }
+      }, 600);
     }, 800);
   }, [
     accepted,
@@ -232,10 +257,13 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     scaleAnim,
     fadeAnim,
     triggerHaptic,
+    driverLocation,
+    navigation,
   ]);
 
   const panHandler = useAnimatedGestureHandler({
     onStart: () => {
+      console.log('Gesture started');
       // Simplified start - no haptic to avoid runOnJS conflicts
     },
     onActive: e => {
@@ -253,16 +281,24 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     onEnd: () => {
       try {
         const currentTranslateX = translateX.value;
+        console.log(
+          'Gesture ended - currentTranslateX:',
+          currentTranslateX,
+          'threshold:',
+          ACCEPT_THRESHOLD * 0.85,
+        );
         if (currentTranslateX >= ACCEPT_THRESHOLD * 0.85) {
+          console.log('Gesture threshold reached, calling onAccept...');
           // Simplified success handling with error protection
           translateX.value = withTiming(
             ACCEPT_THRESHOLD,
             {duration: 200},
             () => {
               try {
+                console.log('About to call runOnJS(onAccept)');
                 runOnJS(onAccept)();
-              } catch (error) {
-                console.log('Error calling onAccept:', error);
+              } catch (_error) {
+                console.log('Error calling onAccept:', _error);
               }
             },
           );
@@ -309,7 +345,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     slideDownOrderUI();
     setTimeout(() => {
       import('@utils/NavigationUtils').then(({goBack}) => {
-        goBack().catch(error => {
+        goBack().catch(_error => {
           navigation?.goBack?.();
         });
       });
@@ -350,15 +386,15 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           // Now start watching for location changes
           startWatchingLocation();
         },
-        error => {
-          if (error.code === 1) {
+        _error => {
+          if (_error.code === 1) {
             // Permission denied
             Alert.alert(
               'Permission Denied',
               'Location permission is required. Please enable location access in your device settings.',
               [{text: 'OK'}],
             );
-          } else if (error.code === 2) {
+          } else if (_error.code === 2) {
             // Position unavailable
             Alert.alert(
               'Location Unavailable',
@@ -368,7 +404,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           } else {
             Alert.alert(
               'Location Error',
-              `Failed to get initial location: ${error.message}`,
+              `Failed to get initial location: ${_error.message}`,
               [{text: 'OK'}],
             );
           }
@@ -388,15 +424,15 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           console.log('Location updated:', location);
           setDriverLocation(location);
         },
-        error => {
-          if (error.code === 1) {
+        _error => {
+          if (_error.code === 1) {
             // Permission denied
             Alert.alert(
               'Permission Denied',
               'Location permission is required. Please enable location access in your device settings.',
               [{text: 'OK'}],
             );
-          } else if (error.code === 2) {
+          } else if (_error.code === 2) {
             // Position unavailable
             Alert.alert(
               'Location Unavailable',
@@ -406,7 +442,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           } else {
             Alert.alert(
               'Location Error',
-              `Failed to watch location: ${error.message}`,
+              `Failed to watch location: ${_error.message}`,
               [{text: 'OK'}],
             );
           }
@@ -425,7 +461,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
         clearLocationWatch(watchId);
       }
     };
-  }, []);
+  }, [watchId]);
 
   return (
     <GestureHandlerRootView style={styles.gestureContainer}>
@@ -465,7 +501,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
             pinColor="purple"
             anchor={{x: 0.5, y: 0.5}}
             centerOffset={{x: 0, y: 0}}>
-            <View style={{alignItems: 'center', justifyContent: 'center'}}>
+            <View style={styles.markerContainer}>
               <Icon name="motorbike" size={32} color="purple" />
             </View>
           </Marker>
@@ -479,7 +515,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
             pinColor="green"
             anchor={{x: 0.5, y: 0.5}}
             centerOffset={{x: 0, y: 0}}>
-            <View style={{alignItems: 'center', justifyContent: 'center'}}>
+            <View style={styles.markerContainer}>
               <Icon name="home" size={32} color="green" />
             </View>
           </Marker>
@@ -493,7 +529,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
             pinColor="red"
             anchor={{x: 0.5, y: 0.5}}
             centerOffset={{x: 0, y: 0}}>
-            <View style={{alignItems: 'center', justifyContent: 'center'}}>
+            <View style={styles.markerContainer}>
               <Icon name="store" size={32} color="red" />
             </View>
           </Marker>
@@ -689,6 +725,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

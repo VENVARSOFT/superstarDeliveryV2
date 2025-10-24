@@ -13,6 +13,8 @@ import DeliveryOrders from '@features/delivery/DeliveryOrders';
 import DeliveryHistory from '@features/delivery/DeliveryHistory';
 import AcceptOrderScreen from '@features/delivery/AcceptOrderScreen';
 import PickupNavigationScreen from '@features/delivery/PickupNavigationScreen';
+import OrderDetailsScreen from '@features/delivery/OrderDetailsScreen';
+import DropOrderScreen from '@features/delivery/DropOrderScreen';
 import Earnings from '@features/delivery/Earnings';
 import VehicleDetails from '@features/delivery/VehicleDetails';
 import Profile from '@features/profile/Profile';
@@ -59,6 +61,20 @@ const Navigation: FC = () => {
         <Stack.Screen
           name="PickupNavigation"
           component={PickupNavigationScreen}
+          options={{
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="OrderDetails"
+          component={OrderDetailsScreen}
+          options={{
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="DropOrder"
+          component={DropOrderScreen}
           options={{
             animation: 'slide_from_bottom',
           }}

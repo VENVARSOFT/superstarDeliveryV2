@@ -1,11 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  memo,
-} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -38,6 +31,7 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolate,
+  Easing,
 } from 'react-native-reanimated';
 import BottomSheet, {BottomSheetView} from '@gorhom/bottom-sheet';
 import Haptic from 'react-native-haptic-feedback';
@@ -142,7 +136,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       latitudeDelta: 0.015,
       longitudeDelta: 0.0121,
     };
-  }, [initialDriverLocation]); // Only depend on initial location, not driver location
+  }, [driverLocation, initialDriverLocation]);
 
   // Check location permissions
   const checkLocationPermission = useCallback(async () => {
@@ -360,55 +354,148 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
   // Swipe gesture handler for "Reached pickup" button
   const swipeGestureHandler = useAnimatedGestureHandler({
     onStart: () => {
-      runOnJS(() => {
-        Haptic.trigger('impactLight', {enableVibrateFallback: true});
-      })();
+      console.log('Gesture started');
+      // Simplified start - no haptic to avoid runOnJS conflicts
     },
     onActive: event => {
-      if (!isSwipeComplete.value) {
-        swipeTranslateX.value = Math.max(
-          0,
-          Math.min(event.translationX, SWIPE_THRESHOLD),
-        );
+      try {
+        if (!isSwipeComplete.value) {
+          const newTranslateX = Math.max(
+            0,
+            Math.min(event.translationX, SWIPE_THRESHOLD),
+          );
+          swipeTranslateX.value = newTranslateX;
+          console.log(
+            'Gesture active - translationX:',
+            event.translationX,
+            'newTranslateX:',
+            newTranslateX,
+          );
+        }
+        // Removed progressive haptic feedback to prevent runOnJS conflicts
+      } catch (error) {
+        console.log('Gesture active error:', error);
       }
     },
     onEnd: () => {
-      if (swipeTranslateX.value >= SWIPE_THRESHOLD * 0.99) {
-        isSwipeComplete.value = true;
-        swipeTranslateX.value = withTiming(SWIPE_THRESHOLD, {duration: 150});
-        runOnJS(() => {
-          Haptic.trigger('notificationSuccess', {enableVibrateFallback: true});
-          Vibration.vibrate([0, 50, 100, 50]);
-          handleReachedPickup();
-        })();
-      } else {
-        swipeTranslateX.value = withTiming(0, {duration: 200});
-        runOnJS(() => {
-          Haptic.trigger('impactLight', {enableVibrateFallback: true});
-        })();
+      try {
+        const currentTranslateX = swipeTranslateX.value;
+        console.log('=== GESTURE END DEBUG ===');
+        console.log('currentTranslateX:', currentTranslateX);
+        console.log('SWIPE_THRESHOLD:', SWIPE_THRESHOLD);
+        console.log('threshold (0.85):', SWIPE_THRESHOLD * 0.85);
+        console.log('isSwipeComplete:', isSwipeComplete.value);
+
+        if (currentTranslateX >= SWIPE_THRESHOLD * 0.85) {
+          console.log(
+            '✅ Gesture threshold reached, calling onReachedPickup...',
+          );
+          // Simplified success handling with error protection
+          isSwipeComplete.value = true;
+          swipeTranslateX.value = withTiming(SWIPE_THRESHOLD, {duration: 200});
+
+          // Call function directly without animation callback
+          try {
+            console.log('About to call runOnJS(onReachedPickup)');
+            runOnJS(onReachedPickup)();
+          } catch (_error) {
+            console.log('Error calling onReachedPickup:', _error);
+          }
+        } else {
+          console.log('❌ Gesture did not reach threshold, resetting...');
+          // Simplified reset with error protection
+          swipeTranslateX.value = withTiming(0, {
+            duration: 300,
+            easing: Easing.out(Easing.cubic),
+          });
+        }
+      } catch (error) {
+        console.log('Gesture end error:', error);
+        // Reset to safe state
+        swipeTranslateX.value = 0;
       }
     },
   });
 
-  // Handle reached pickup confirmation
-  const handleReachedPickup = useCallback(() => {
-    Alert.alert(
-      'Reached Pickup',
-      'You have confirmed arrival at the pickup location.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate to next screen or update order status
-            navigation?.navigate('DeliveryNavigation', {
-              orderId: route?.params?.orderId,
-              pickupLocation,
+  // Simplified haptic feedback functions to avoid runOnJS conflicts
+  const triggerHaptic = useCallback(
+    (type: 'light' | 'medium' | 'success' | 'heavy') => {
+      try {
+        switch (type) {
+          case 'light':
+            Haptic.trigger('impactLight', {enableVibrateFallback: true});
+            break;
+          case 'medium':
+            Haptic.trigger('impactMedium', {enableVibrateFallback: true});
+            break;
+          case 'success':
+            Haptic.trigger('notificationSuccess', {
+              enableVibrateFallback: true,
             });
+            break;
+          case 'heavy':
+            Haptic.trigger('impactHeavy', {enableVibrateFallback: true});
+            break;
+        }
+      } catch (error) {
+        console.log('Haptic error:', error);
+      }
+    },
+    [],
+  );
+
+  // Handle reached pickup confirmation - main function
+  const onReachedPickup = useCallback(async () => {
+    console.log('=== onReachedPickup called ===');
+    console.log('Navigation object:', navigation);
+    console.log('Route params:', route?.params);
+    console.log('Pickup location:', pickupLocation);
+
+    // Enhanced success haptic feedback
+    triggerHaptic('success');
+    Vibration.vibrate([0, 50, 100, 50, 100]);
+
+    // Immediate navigation test - remove setTimeout to debug
+    console.log('About to navigate immediately...');
+    if (navigation) {
+      try {
+        console.log('Navigation object exists, calling navigate...');
+        navigation.navigate('OrderDetails', {
+          orderDetails: {
+            orderId: route?.params?.orderId || 'ORDER_123456',
+            customerName: 'John Doe',
+            customerPhone: '+91-9876543210',
+            customerAddress: '123 Main Street, Hyderabad, Telangana 500001',
+            restaurantName: pickupLocation.name,
+            restaurantAddress: pickupLocation.address,
+            items: [
+              {name: 'Chicken Biryani', quantity: 2, price: 180},
+              {name: 'Mutton Curry', quantity: 1, price: 120},
+              {name: 'Raita', quantity: 2, price: 40},
+            ],
+            totalAmount: 340,
+            deliveryFee: 25,
+            estimatedEarnings: 25,
+            estimatedTime: '15-20 mins',
+            specialInstructions:
+              'Please call when you arrive. Ring the doorbell twice.',
           },
-        },
-      ],
-    );
-  }, [navigation, route?.params?.orderId, pickupLocation]);
+        });
+        console.log('Navigation call completed');
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        Alert.alert(
+          'Navigation Error',
+          `Failed to navigate: ${
+            navError instanceof Error ? navError.message : 'Unknown error'
+          }`,
+        );
+      }
+    } else {
+      console.error('Navigation object is null or undefined');
+      Alert.alert('Navigation Error', 'Unable to navigate to order details');
+    }
+  }, [navigation, route?.params, pickupLocation, triggerHaptic]);
 
   // Animated styles for swipe button
   const swipeButtonStyle = useAnimatedStyle(() => {
@@ -449,7 +536,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
         Geolocation.clearWatch(locationWatchId.current);
       }
     };
-  }, []); // Empty dependency array to run only once
+  }, [initializeLocation]); // Include initializeLocation dependency
 
   // Occasionally animate map to driver location (every 30 seconds)
   useEffect(() => {
@@ -460,7 +547,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     }, 30000); // Every 30 seconds
 
     return () => clearInterval(interval);
-  }, [driverLocation]); // Only depend on driverLocation
+  }, [driverLocation, animateToDriverLocation]); // Include animateToDriverLocation dependency
 
   // Handle back button
   const handleBack = useCallback(() => {
@@ -668,8 +755,13 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Test button for debugging */}
+          <TouchableOpacity style={styles.testButton} onPress={onReachedPickup}>
+            <Text style={styles.testButtonText}>Reached pickup</Text>
+          </TouchableOpacity>
+
           {/* Swipe to confirm button */}
-          <View style={styles.swipeContainer}>
+          {/* <View style={styles.swipeContainer}>
             <Animated.View style={[styles.swipeTrack, swipeTrackStyle]}>
               <Text style={styles.swipeText}>Reached pickup</Text>
               <PanGestureHandler onGestureEvent={swipeGestureHandler}>
@@ -678,7 +770,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
                 </Animated.View>
               </PanGestureHandler>
             </Animated.View>
-          </View>
+          </View> */}
         </BottomSheetView>
       </BottomSheet>
     </GestureHandlerRootView>
@@ -925,6 +1017,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: Fonts.SemiBold,
     color: 'white',
+  },
+  testButton: {
+    backgroundColor: PRIMARY_GREEN,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontFamily: Fonts.SemiBold,
   },
   swipeContainer: {
     marginBottom: 20,
