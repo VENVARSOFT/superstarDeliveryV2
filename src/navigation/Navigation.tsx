@@ -19,6 +19,7 @@ import Earnings from '@features/delivery/Earnings';
 import VehicleDetails from '@features/delivery/VehicleDetails';
 import Profile from '@features/profile/Profile';
 import ConfirmLocation from '@features/map/ConfirmLocation';
+import OrderAssignmentScreen from '@features/orders/OrderAssignmentScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -83,6 +84,13 @@ const Navigation: FC = () => {
         <Stack.Screen name="VehicleDetails" component={VehicleDetails} />
         <Stack.Screen name="Profile" component={Profile} />
         <Stack.Screen name="ConfirmLocation" component={ConfirmLocation} />
+        <Stack.Screen
+          name="OrderAssignment"
+          component={OrderAssignmentScreen}
+          options={{
+            animation: 'slide_from_bottom',
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

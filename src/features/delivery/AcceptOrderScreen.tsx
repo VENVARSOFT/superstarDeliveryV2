@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
-  Vibration,
   Animated as RNAnimated,
   Easing,
   Alert,
@@ -24,7 +23,6 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import Haptic from 'react-native-haptic-feedback';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
 import Geolocation from '@react-native-community/geolocation';
@@ -75,41 +73,10 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   // Swipe to accept values
   const translateX = useSharedValue(0);
 
-  // Simplified haptic feedback functions to avoid runOnJS conflicts
-  const triggerHaptic = useCallback(
-    (type: 'light' | 'medium' | 'success' | 'heavy') => {
-      try {
-        switch (type) {
-          case 'light':
-            Haptic.trigger('impactLight', {enableVibrateFallback: true});
-            break;
-          case 'medium':
-            Haptic.trigger('impactMedium', {enableVibrateFallback: true});
-            break;
-          case 'success':
-            Haptic.trigger('notificationSuccess', {
-              enableVibrateFallback: true,
-            });
-            break;
-          case 'heavy':
-            Haptic.trigger('impactHeavy', {enableVibrateFallback: true});
-            break;
-        }
-      } catch (error) {
-        console.log('Haptic error:', error);
-      }
-    },
-    [],
-  );
-
   const slideUpOrderUI = useCallback(() => {
     if (isAnimating) return;
     setIsAnimating(true);
     setShowOrderUI(true);
-
-    // Simplified haptic feedback for order arrival
-    triggerHaptic('medium');
-    Vibration.vibrate([0, 100, 50, 100]);
 
     // Smooth fade in and scale animation for Order UI
     RNAnimated.parallel([
@@ -139,14 +106,11 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     setTimeout(() => {
       setIsAnimating(false);
     }, 550);
-  }, [slideAnim, fadeAnim, scaleAnim, isAnimating, triggerHaptic]);
+  }, [slideAnim, fadeAnim, scaleAnim, isAnimating]);
 
   const slideDownOrderUI = useCallback(() => {
     if (isAnimating) return;
     setIsAnimating(true);
-
-    // Light haptic feedback for dismiss
-    triggerHaptic('light');
 
     // Smooth fade out and scale down animation
     RNAnimated.parallel([
@@ -176,7 +140,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
         setIsAnimating(false);
       });
     }, 100);
-  }, [slideAnim, fadeAnim, scaleAnim, isAnimating, triggerHaptic]);
+  }, [slideAnim, fadeAnim, scaleAnim, isAnimating]);
 
   const onAccept = useCallback(async () => {
     console.log(
@@ -188,9 +152,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     if (accepted || isAnimating) return;
     setAccepted(true);
     console.log('Order accepted, starting navigation process...');
-    // Enhanced success haptic feedback
-    triggerHaptic('success');
-    Vibration.vibrate([0, 50, 100, 50, 100]);
     // Success animation with scale and fade
     RNAnimated.parallel([
       RNAnimated.timing(scaleAnim, {
@@ -256,7 +217,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     isAnimating,
     scaleAnim,
     fadeAnim,
-    triggerHaptic,
     driverLocation,
     navigation,
   ]);
@@ -338,10 +298,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   const onDeny = useCallback(() => {
     if (isAnimating) return;
 
-    // Enhanced deny haptic feedback
-    triggerHaptic('heavy');
-    Vibration.vibrate([0, 100, 50, 100, 50]);
-
     slideDownOrderUI();
     setTimeout(() => {
       import('@utils/NavigationUtils').then(({goBack}) => {
@@ -350,13 +306,9 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
         });
       });
     }, 600);
-  }, [navigation, slideDownOrderUI, isAnimating, triggerHaptic]);
+  }, [navigation, slideDownOrderUI, isAnimating]);
 
   useEffect(() => {
-    // arrival feedback
-    triggerHaptic('medium');
-    Vibration.vibrate(60);
-
     // Simulate new order arrival after 2 seconds to let map stabilize
     const timer = setTimeout(() => {
       slideUpOrderUI();
@@ -369,7 +321,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       fadeAnim.stopAnimation();
       scaleAnim.stopAnimation();
     };
-  }, [slideUpOrderUI, triggerHaptic, slideAnim, fadeAnim, scaleAnim]);
+  }, [slideUpOrderUI, slideAnim, fadeAnim, scaleAnim]);
 
   useEffect(() => {
     // First get current position to ensure permissions are granted

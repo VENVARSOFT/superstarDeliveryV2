@@ -2,6 +2,8 @@
  * @format
  */
 
+global.self = global;
+
 import 'react-native-get-random-values';
 import {AppRegistry, Text, TextInput} from 'react-native';
 import App from './App';

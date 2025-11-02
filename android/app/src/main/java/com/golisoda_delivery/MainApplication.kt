@@ -1,4 +1,4 @@
-package com.grocery_app
+package com.golisoda_delivery
 
 import android.app.Application
 import com.facebook.react.PackageList

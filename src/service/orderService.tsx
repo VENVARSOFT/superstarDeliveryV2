@@ -271,3 +271,22 @@ export const getDeliveryAgentOrders = async (
     return null;
   }
 };
+
+// API function to respond to order assignment
+export const respondAssignment = async (
+  orderId: string,
+  deliveryAgentId: string,
+  response: string,
+) => {
+  try {
+    const apiResponse = await appAxios.post('/orders/assignment/respond', {
+      orderId,
+      deliveryAgentId,
+      response,
+    });
+    return apiResponse.data;
+  } catch (error) {
+    console.error('Error responding to order assignment:', error);
+    return null;
+  }
+};

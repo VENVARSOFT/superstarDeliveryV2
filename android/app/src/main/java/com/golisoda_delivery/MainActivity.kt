@@ -1,4 +1,4 @@
-package com.grocery_app
+package com.golisoda_delivery
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

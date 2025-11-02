@@ -7,10 +7,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
-import {Colors} from '@utils/Constants';
+import {Colors, Fonts} from '@utils/Constants';
 import {useAuthStore} from '@state/authStore';
 import StatsCards from '@components/delivery/StatsCards';
-import DeliveryStatusSection from '@components/delivery/DeliveryStatusSection';
 import TabBar from '@components/delivery/TabBar';
 import Geolocation from '@react-native-community/geolocation';
 import {reverseGeocode} from '@service/mapService';
@@ -24,6 +23,14 @@ import {
 } from '@utils/Data';
 import DeliveryHeader from '@components/delivery/DeliveryHeader';
 import {getDeliveryAgentOrders} from '@service/orderService';
+import {
+  connectSocket,
+  onSocketStatusChange,
+  subscribeToTopic,
+  unsubscribeTopic,
+} from '@service/socketService';
+
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const DeliveryDashboard = () => {
   const {user, setUser} = useAuthStore();
@@ -34,6 +41,8 @@ const DeliveryDashboard = () => {
   const [data, setData] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [socketConnecting, setSocketConnecting] = useState(false);
 
   const fetchData = React.useCallback(async () => {
     setData([]);
@@ -135,6 +144,52 @@ const DeliveryDashboard = () => {
     fetchData();
   }, [fetchData]);
 
+  // Socket connection and subscription logic
+  useEffect(() => {
+    // Start connection and set connecting state
+    setSocketConnecting(true);
+    connectSocket();
+
+    // Listen to connection status
+    const unsubscribeStatus = onSocketStatusChange(status => {
+      console.log(
+        '🔄 Socket connection status:',
+        status ? '🟢 Connected' : '🔴 Disconnected',
+      );
+      setSocketConnected(status);
+      // If connected, we're no longer connecting
+      if (status) {
+        setSocketConnecting(false);
+      }
+    });
+
+    // Subscribe to order assignment topic
+    const topic = '/topic/orders/assignment';
+    subscribeToTopic(topic, orderData => {
+      console.log('📦 New order assignment:', orderData);
+      // Add new order to the available orders list if it matches the current tab
+      if (selectedTab === 'available') {
+        setData(prev => {
+          // Check if order already exists to avoid duplicates
+          const exists = prev.some(
+            order =>
+              order.idOrder === orderData.idOrder ||
+              order.orderId === orderData.orderId,
+          );
+          if (!exists) {
+            return [...prev, orderData];
+          }
+          return prev;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeStatus();
+      unsubscribeTopic(topic);
+    };
+  }, [selectedTab]);
+
   const renderOrderItem = React.useCallback(({item, index}: any) => {
     return <DeliveryOrderItem index={index} item={item} />;
   }, []);
@@ -162,6 +217,38 @@ const DeliveryDashboard = () => {
           name={user ? `${user.nmFirst || ''} ${user.nmLast || ''}`.trim() : ''}
           email={user?.idEmail || ''}
         />
+        {/* Socket Connection Status Indicator */}
+        <View style={styles.statusContainer}>
+          <View
+            style={[
+              styles.statusIndicator,
+              socketConnected
+                ? styles.statusConnected
+                : socketConnecting
+                ? styles.statusConnecting
+                : styles.statusDisconnected,
+            ]}>
+            <Icon
+              name={
+                socketConnected
+                  ? 'wifi'
+                  : socketConnecting
+                  ? 'wifi-sync'
+                  : 'wifi-off'
+              }
+              size={14}
+              color="white"
+              style={styles.statusIcon}
+            />
+            <CustomText style={styles.statusText}>
+              {socketConnected
+                ? 'Connected'
+                : socketConnecting
+                ? 'Connecting...'
+                : 'Disconnected'}
+            </CustomText>
+          </View>
+        </View>
         {/* Statistics Cards */}
         <StatsCards />
         {/* Delivery Status Section */}
@@ -221,6 +308,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 8,
     textAlign: 'center',
+  },
+  statusContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  statusConnected: {
+    backgroundColor: '#10B981', // Green
+  },
+  statusConnecting: {
+    backgroundColor: '#F59E0B', // Amber/Orange
+  },
+  statusDisconnected: {
+    backgroundColor: '#EF4444', // Red
+  },
+  statusIcon: {
+    marginRight: 2,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: Fonts.Medium,
   },
 });
 
