@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0897B69F006FA8919D217E4F /* Pods_golisoda_delivery.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7591A92C00231519BF0FA32A /* Pods_golisoda_delivery.framework */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		18199549DF2A4E3386992F27 /* Okra-MediumLight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E24318E41E1B47448AB2B8BC /* Okra-MediumLight.ttf */; };
 		39688F2C60A374C33C39C596 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		7F1639D55ADA97F70D9D49EC /* Pods_golisoda_delivery.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DBC56C9770725FAFE63A7744 /* Pods_golisoda_delivery.framework */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		87960F13EDA1448BB3E98267 /* Okra-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 912247C4FDD84B69AB96F7E2 /* Okra-Bold.ttf */; };
 		9A9831556AF442849EC3AD6E /* Okra-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2804F6A9ADBC44E68F4E42CE /* Okra-Regular.ttf */; };
@@ -24,18 +24,16 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = grocery_app/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = grocery_app/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = grocery_app/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		13F821179FCFAE30610E9B96 /* Pods-grocery_app.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-grocery_app.release.xcconfig"; path = "Target Support Files/Pods-grocery_app/Pods-grocery_app.release.xcconfig"; sourceTree = "<group>"; };
 		24022A7A9B64467AADA9A61B /* Okra-ExtraBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Okra-ExtraBold.ttf"; path = "../src/assets/fonts/Okra-ExtraBold.ttf"; sourceTree = "<group>"; };
 		2804F6A9ADBC44E68F4E42CE /* Okra-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Okra-Regular.ttf"; path = "../src/assets/fonts/Okra-Regular.ttf"; sourceTree = "<group>"; };
-		5E3E9D13B788BBBEE99D39D6 /* Pods-golisoda_delivery.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-golisoda_delivery.debug.xcconfig"; path = "Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery.debug.xcconfig"; sourceTree = "<group>"; };
+		378A314DAE6331F49A9DCE4F /* Pods-golisoda_delivery.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-golisoda_delivery.debug.xcconfig"; path = "Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery.debug.xcconfig"; sourceTree = "<group>"; };
 		63F7C6D600CD4D798145D473 /* Okra-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Okra-Medium.ttf"; path = "../src/assets/fonts/Okra-Medium.ttf"; sourceTree = "<group>"; };
-		7591A92C00231519BF0FA32A /* Pods_golisoda_delivery.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_golisoda_delivery.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = grocery_app/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = grocery_app/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		912247C4FDD84B69AB96F7E2 /* Okra-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Okra-Bold.ttf"; path = "../src/assets/fonts/Okra-Bold.ttf"; sourceTree = "<group>"; };
-		C998CC3C4FA770985B240C88 /* Pods-grocery_app.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-grocery_app.debug.xcconfig"; path = "Target Support Files/Pods-grocery_app/Pods-grocery_app.debug.xcconfig"; sourceTree = "<group>"; };
-		CFC756AE95033A142C7853DB /* Pods-golisoda_delivery.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-golisoda_delivery.release.xcconfig"; path = "Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery.release.xcconfig"; sourceTree = "<group>"; };
+		DBC56C9770725FAFE63A7744 /* Pods_golisoda_delivery.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_golisoda_delivery.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E24318E41E1B47448AB2B8BC /* Okra-MediumLight.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Okra-MediumLight.ttf"; path = "../src/assets/fonts/Okra-MediumLight.ttf"; sourceTree = "<group>"; };
+		E25F99EE81CED6C5E4B4BDDA /* Pods-golisoda_delivery.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-golisoda_delivery.release.xcconfig"; path = "Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -44,7 +42,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0897B69F006FA8919D217E4F /* Pods_golisoda_delivery.framework in Frameworks */,
+				7F1639D55ADA97F70D9D49EC /* Pods_golisoda_delivery.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,7 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				7591A92C00231519BF0FA32A /* Pods_golisoda_delivery.framework */,
+				DBC56C9770725FAFE63A7744 /* Pods_golisoda_delivery.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -105,10 +103,8 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				C998CC3C4FA770985B240C88 /* Pods-grocery_app.debug.xcconfig */,
-				13F821179FCFAE30610E9B96 /* Pods-grocery_app.release.xcconfig */,
-				5E3E9D13B788BBBEE99D39D6 /* Pods-golisoda_delivery.debug.xcconfig */,
-				CFC756AE95033A142C7853DB /* Pods-golisoda_delivery.release.xcconfig */,
+				378A314DAE6331F49A9DCE4F /* Pods-golisoda_delivery.debug.xcconfig */,
+				E25F99EE81CED6C5E4B4BDDA /* Pods-golisoda_delivery.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -132,13 +128,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "golisoda_delivery" */;
 			buildPhases = (
-				FE4FEC8B5A248006E4C83D81 /* [CP] Check Pods Manifest.lock */,
+				654C9CCCA27861C4CAE02A93 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				370623F0049CB4854611EC70 /* [CP] Embed Pods Frameworks */,
-				7399EFFD854E68CD5F480DE5 /* [CP] Copy Pods Resources */,
+				1C274954F75547EFD49D835F /* [CP] Embed Pods Frameworks */,
+				1461398A9A0376E5FC578D61 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -215,24 +211,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
-		370623F0049CB4854611EC70 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		7399EFFD854E68CD5F480DE5 /* [CP] Copy Pods Resources */ = {
+		1461398A9A0376E5FC578D61 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -249,7 +228,24 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		FE4FEC8B5A248006E4C83D81 /* [CP] Check Pods Manifest.lock */ = {
+		1C274954F75547EFD49D835F /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-golisoda_delivery/Pods-golisoda_delivery-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		654C9CCCA27861C4CAE02A93 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -287,7 +283,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5E3E9D13B788BBBEE99D39D6 /* Pods-golisoda_delivery.debug.xcconfig */;
+			baseConfigurationReference = 378A314DAE6331F49A9DCE4F /* Pods-golisoda_delivery.debug.xcconfig */;
 			buildSettings = {
 				"ARCHS[sdk=iphonesimulator*]" = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -318,7 +314,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CFC756AE95033A142C7853DB /* Pods-golisoda_delivery.release.xcconfig */;
+			baseConfigurationReference = E25F99EE81CED6C5E4B4BDDA /* Pods-golisoda_delivery.release.xcconfig */;
 			buildSettings = {
 				"ARCHS[sdk=iphonesimulator*]" = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

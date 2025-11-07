@@ -7,7 +7,8 @@ global.self = global;
 import 'react-native-get-random-values';
 import {AppRegistry, Text, TextInput} from 'react-native';
 import App from './App';
-import {name as appName} from './app.json';
+import appJson from './app.json';
+const appName = appJson.name;
 import {configureReanimatedLogger} from 'react-native-reanimated';
 
 // Polyfill for parseErrorStack issue with PhonePe SDK

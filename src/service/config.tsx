@@ -1,9 +1,6 @@
-import {Platform} from 'react-native';
-
 export const BASE_URL = 'http://206.189.137.107:8080/api/';
 
-export const SOCKET_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+export const SOCKET_URL = 'http://206.189.137.107:9092';
 export const GOOGLE_MAP_API = 'AIzaSyAjhAUSBUszFtkWC_gLPGhVz15A_HeQO5Q';
 // Separate key for Google Geocoding REST API (should not be bundle-restricted)
 export const GOOGLE_GEOCODING_API = 'AIzaSyAjhAUSBUszFtkWC_gLPGhVz15A_HeQO5Q';

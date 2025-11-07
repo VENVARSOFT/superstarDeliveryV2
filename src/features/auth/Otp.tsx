@@ -80,7 +80,7 @@ const Otp = () => {
           tokenExpiry,
         });
         // Navigate to dashboard
-        resetAndNavigate('DeliveryDashboard');
+        resetAndNavigate('Home');
       } else {
         throw new Error(response.error || 'OTP verification failed');
       }

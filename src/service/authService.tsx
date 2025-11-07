@@ -124,10 +124,13 @@ export const verifyOTP = async (
 
 export const getUserDetails = async (idUser: number, txPhoneNumber: string) => {
   try {
-    const response = await appAxios.post('/users/getUserDetails', {
-      idUser,
-      txPhoneNumber,
-    });
+    const response = await appAxios.post(
+      '/users/deliveryagent/getUserDeliveryAgentDetails',
+      {
+        idUser,
+        txPhoneNumber,
+      },
+    );
     return response.data;
   } catch (error: any) {
     throw error;

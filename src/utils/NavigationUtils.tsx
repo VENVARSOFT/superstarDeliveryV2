@@ -20,15 +20,22 @@ export async function replace(routeName: string, params?: object) {
   }
 }
 
-export async function resetAndNavigate(routeName: string) {
-  console.log('Attempting to navigate to:', routeName);
+export async function resetAndNavigate(
+  routeName: string | {pathname: string; params?: object},
+  params?: object,
+) {
+  const route = typeof routeName === 'string' ? routeName : routeName.pathname;
+  const routeParams =
+    typeof routeName === 'object' ? routeName.params : params;
+
+  console.log('Attempting to navigate to:', route);
 
   if (navigationRef.isReady()) {
-    console.log('Navigation is ready, dispatching reset to:', routeName);
+    console.log('Navigation is ready, dispatching reset to:', route);
     navigationRef.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{name: routeName}],
+        routes: [{name: route, params: routeParams}],
       }),
     );
   } else {
@@ -36,14 +43,11 @@ export async function resetAndNavigate(routeName: string) {
     // Try again after a short delay
     setTimeout(() => {
       if (navigationRef.isReady()) {
-        console.log(
-          'Navigation ready on retry, dispatching reset to:',
-          routeName,
-        );
+        console.log('Navigation ready on retry, dispatching reset to:', route);
         navigationRef.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{name: routeName}],
+            routes: [{name: route, params: routeParams}],
           }),
         );
       } else {

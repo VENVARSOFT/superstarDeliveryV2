@@ -12,7 +12,7 @@ import {
 import React, {useEffect, useState, useCallback, useRef} from 'react';
 import {useAuthStore} from '@state/authStore';
 import {fetchDeliveryOrders} from '@service/orderService';
-import {getDeliveryDetails, updateDeliveryProfile} from '@service/authService';
+
 import CustomHeader from '@components/ui/CustomHeader';
 import DeliveryOrderItem from '@components/delivery/DeliveryOrderItem';
 import CustomText from '@components/ui/CustomText';
@@ -25,6 +25,8 @@ import {RFValue} from 'react-native-responsive-fontsize';
 import CustomInput from '@components/ui/CustomInput';
 import CustomButton from '@components/ui/CustomButton';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {getUserDetails} from '@service/authService';
+import socketService from '@service/socketService';
 const {height: screenHeight} = Dimensions.get('window');
 
 interface DeliveryDetails {
@@ -97,7 +99,7 @@ const DeliveryProfile = () => {
     if (user?.idUser && user?.nbPhone) {
       setLoading(true);
       try {
-        const response = await getDeliveryDetails(user.idUser, user.nbPhone);
+        const response = await getUserDetails(user.idUser, user.nbPhone);
         if (response.success && response.data) {
           setDeliveryDetails(response.data);
         }
@@ -108,6 +110,10 @@ const DeliveryProfile = () => {
       }
     }
   }, [user?.idUser, user?.nbPhone]);
+
+  const handleNavigateToRideTracking = async () => {
+    navigate('RideTracking', {rideId: '123'});
+  };
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -449,6 +455,11 @@ const DeliveryProfile = () => {
               label="Vehicle Details"
               onPress={() => navigate('VehicleDetails')}
             />
+            <ActionButton
+              icon="map-marker-path"
+              label="Ride Tracking"
+              onPress={handleNavigateToRideTracking}
+            />
 
             {/* Support Section */}
             <ActionButton
@@ -463,7 +474,7 @@ const DeliveryProfile = () => {
                 logout();
                 // Clear tokenManager storage
                 tokenManager.clearTokens();
-                resetAndNavigate('DeliveryLogin');
+                resetAndNavigate('CustomerLogin');
               }}
             />
 
