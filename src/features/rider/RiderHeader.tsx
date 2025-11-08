@@ -36,7 +36,7 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
   const {emit} = useWS();
   const [_location, setLocation] = useState<LocationState | null>(null);
   const [isFocused, _setIsFocused] = useState(false);
-  const [todaysEarnings, _setTodaysEarnings] = useState(50031.22);
+  const [todaysEarnings, _setTodaysEarnings] = useState(0.0);
 
   // Animation values
   const toggleAnim = useSharedValue(0);

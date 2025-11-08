@@ -7,6 +7,7 @@ import {OrderAssignmentRequest, useWS} from '@service/WsProvider';
 import {getAddressFromCoords} from '@service/mapService';
 import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
+import {navigate} from '@utils/NavigationUtils';
 import RiderHeader from '../rider/RiderHeader';
 import RiderRideItem from '../rider/RiderRideItem';
 import CustomText from '@components/ui/CustomText';
@@ -27,7 +28,7 @@ const Home = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   //WEBSOCKET
   const socketService = useWS();
-  const {emit, on, off} = useWS();
+  const {emit, on, off, onOrderAssignmentResponse} = useWS();
 
   const [rideOffers, setRideOffers] = useState<any[]>([]);
   //LOCATION
@@ -75,25 +76,10 @@ const Home = () => {
       console.log('📦 New order assignment request received:', data);
       setOrderRequest(data);
 
-      // Show alert notification
-      Alert.alert(
-        '🚚 New Order Available!',
-        `Order #${data.orderNumber}\n` +
-          `Amount: $${data.orderInfo.totalAmount}\n` +
-          `Address: ${data.orderInfo.formattedAddress}`,
-        [
-          {
-            text: 'Reject',
-            style: 'cancel',
-            onPress: () => handleRejectOrder(data),
-          },
-          {
-            text: 'Accept',
-            onPress: () => handleAcceptOrder(data),
-          },
-        ],
-        {cancelable: false},
-      );
+      // Navigate to AcceptOrderScreen with order data
+      navigate('AcceptOrder', {
+        orderData: data,
+      });
     });
 
     // 4. Listen for order assignment responses
@@ -174,77 +160,77 @@ const Home = () => {
     userRef.current = user;
   }, [user]);
 
-  useEffect(() => {
-    const startLocationUpdates = () => {
-      // Request location permission
-      Geolocation.requestAuthorization();
+  // useEffect(() => {
+  //   const startLocationUpdates = () => {
+  //     // Request location permission
+  //     Geolocation.requestAuthorization();
 
-      // Start watching position
-      locationsSubscriptionRef.current = Geolocation.watchPosition(
-        async position => {
-          const {latitude, longitude, heading} = position.coords;
+  //     // Start watching position
+  //     locationsSubscriptionRef.current = Geolocation.watchPosition(
+  //       async position => {
+  //         const {latitude, longitude, heading} = position.coords;
 
-          // Get address from coordinates
-          let address = 'Somewhere';
-          try {
-            const fetchedAddress = await getAddressFromCoords(
-              latitude,
-              longitude,
-            );
-            if (fetchedAddress) {
-              address = fetchedAddress;
-            }
-          } catch (error) {
-            console.error('Error fetching address:', error);
-          }
+  //         // Get address from coordinates
+  //         let address = 'Somewhere';
+  //         try {
+  //           const fetchedAddress = await getAddressFromCoords(
+  //             latitude,
+  //             longitude,
+  //           );
+  //           if (fetchedAddress) {
+  //             address = fetchedAddress;
+  //           }
+  //         } catch (error) {
+  //           console.error('Error fetching address:', error);
+  //         }
 
-          // Update local state
-          setLocation({
-            latitude,
-            longitude,
-            address,
-            heading: heading as number,
-          });
+  //         // Update local state
+  //         setLocation({
+  //           latitude,
+  //           longitude,
+  //           address,
+  //           heading: heading as number,
+  //         });
 
-          // Update user in store - create a clean serializable object
-          if (userRef.current) {
-            // Create a clean copy without any functions or non-serializable values
-            const cleanUser = JSON.parse(JSON.stringify(userRef.current));
-            setUser({
-              ...cleanUser,
-              liveLocation: {latitude, longitude},
-              address,
-            });
-          }
+  //         // Update user in store - create a clean serializable object
+  //         if (userRef.current) {
+  //           // Create a clean copy without any functions or non-serializable values
+  //           const cleanUser = JSON.parse(JSON.stringify(userRef.current));
+  //           setUser({
+  //             ...cleanUser,
+  //             liveLocation: {latitude, longitude},
+  //             address,
+  //           });
+  //         }
 
-          // Emit location update via WebSocket
-          emit('updateLocation', {
-            latitude,
-            longitude,
-            heading: heading as number,
-          });
-        },
-        error => {
-          console.error('Location tracking error:', error);
-        },
-        {
-          enableHighAccuracy: true,
-          distanceFilter: 10, // Update every 10 meters
-          interval: 10000, // Update every 10 seconds
-        },
-      );
-    };
+  //         // Emit location update via WebSocket
+  //         emit('updateLocation', {
+  //           latitude,
+  //           longitude,
+  //           heading: heading as number,
+  //         });
+  //       },
+  //       error => {
+  //         console.error('Location tracking error:', error);
+  //       },
+  //       {
+  //         enableHighAccuracy: true,
+  //         distanceFilter: 10, // Update every 10 meters
+  //         interval: 10000, // Update every 10 seconds
+  //       },
+  //     );
+  //   };
 
-    startLocationUpdates();
+  //   startLocationUpdates();
 
-    // Cleanup function
-    return () => {
-      if (locationsSubscriptionRef.current !== null) {
-        Geolocation.clearWatch(locationsSubscriptionRef.current);
-        locationsSubscriptionRef.current = null;
-      }
-    };
-  }, [emit, setUser]);
+  //   // Cleanup function
+  //   return () => {
+  //     if (locationsSubscriptionRef.current !== null) {
+  //       Geolocation.clearWatch(locationsSubscriptionRef.current);
+  //       locationsSubscriptionRef.current = null;
+  //     }
+  //   };
+  // }, [emit, setUser]);
 
   const renderRides = useCallback(({item}: {item: any}) => {
     return <RiderRideItem ride={item} />;
@@ -274,6 +260,11 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <RiderHeader onDuty={onDuty} setOnDuty={setOnDuty} />
+      {isConnected && (
+        <CustomText fontSize={12} style={styles.statusText}>
+          Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+        </CustomText>
+      )}
       <FlatList
         data={!onDuty ? [] : rideOffers}
         renderItem={renderRides}
@@ -329,5 +320,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#363636',
     paddingHorizontal: 20,
+  },
+  statusText: {
+    textAlign: 'center',
+    color: '#363636',
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
 });

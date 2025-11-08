@@ -27,6 +27,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
 import Geolocation from '@react-native-community/geolocation';
 import {watchLocation, clearLocationWatch} from '@service/directionsService';
+import {useWS, OrderAssignmentRequest} from '@service/WsProvider';
+import {useSelector} from 'react-redux';
+import type {RootState} from '@state/store';
 
 Geolocation.setRNConfiguration?.({
   skipPermissionRequests: false,
@@ -45,15 +48,23 @@ const PRIMARY_GREEN = '#00A86B';
 const ACCEPT_THRESHOLD = width * 0.7; // 70%
 
 const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
+  // Get order data from route params
+  const orderData: OrderAssignmentRequest | undefined =
+    route?.params?.orderData;
+  const socketService = useWS();
+  const user = useSelector((state: RootState) => state.auth.user);
+
   const [accepted, setAccepted] = useState(false);
   const [showOrderUI, setShowOrderUI] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [orderResponse, setOrderResponse] = useState<any>(null);
   const [driverLocation, setDriverLocation] = useState({
     latitude: route?.params?.driverLat ?? 17.442,
     longitude: route?.params?.driverLng ?? 78.391,
   });
 
   console.log('driverLocation', driverLocation);
+  console.log('orderData', orderData);
 
   const [watchId, setWatchId] = useState<number | null>(null);
   const slideAnim = useRef(new RNAnimated.Value(0)).current;
@@ -149,9 +160,29 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       'isAnimating:',
       isAnimating,
     );
-    if (accepted || isAnimating) return;
+    if (accepted || isAnimating || !orderData) return;
     setAccepted(true);
-    console.log('Order accepted, starting navigation process...');
+    console.log('Order accepted, sending response...');
+
+    // Send accept response via socket
+    const success = socketService.sendOrderAssignmentResponse({
+      orderId: orderData.orderId,
+      deliveryAgentId: user?.idUser as number,
+      response: 'ACCEPT',
+      message: 'I will deliver this order',
+    });
+
+    if (!success) {
+      Alert.alert(
+        'Error',
+        'Failed to send response. Please check your connection.',
+      );
+      setAccepted(false);
+      return;
+    }
+
+    console.log('✅ Accept response sent successfully');
+
     // Success animation with scale and fade
     RNAnimated.parallel([
       RNAnimated.timing(scaleAnim, {
@@ -184,41 +215,16 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       ]).start();
     });
 
-    // simulate API call with better timing
-    setTimeout(() => {
-      slideDownOrderUI();
-      // Navigate to PickupNavigation screen after accepting order
-      setTimeout(() => {
-        console.log('Attempting to navigate to PickupNavigation...');
-        console.log('Navigation object:', navigation);
-        console.log('Driver location:', driverLocation);
-
-        if (navigation) {
-          navigation.navigate('PickupNavigation', {
-            pickupLocation: {
-              latitude: 17.43869444638263,
-              longitude: 78.39538337328888,
-              name: 'SuperStart Golisoda Madhapur',
-              address: 'Plot 59, Guttala Begumpet, Madhapur, Hyderabad',
-              phoneNumber: '+91-9876543210',
-            },
-            driverLocation: driverLocation,
-            orderId: 'ORDER_' + Date.now(),
-          });
-          console.log('Navigation call completed');
-        } else {
-          console.log('Navigation object is null/undefined');
-        }
-      }, 600);
-    }, 800);
+    // Wait for response before navigating
+    // The navigation will be handled in the onOrderAssignmentResponse listener
   }, [
     accepted,
-    slideDownOrderUI,
     isAnimating,
+    orderData,
+    socketService,
+    user,
     scaleAnim,
     fadeAnim,
-    driverLocation,
-    navigation,
   ]);
 
   const panHandler = useAnimatedGestureHandler({
@@ -296,7 +302,24 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   });
 
   const onDeny = useCallback(() => {
-    if (isAnimating) return;
+    if (isAnimating || !orderData) return;
+
+    // Send reject response via socket
+    const success = socketService.sendOrderAssignmentResponse({
+      orderId: orderData.orderId,
+      deliveryAgentId: user?.idUser as number,
+      response: 'REJECT',
+      message: 'Currently unavailable',
+    });
+
+    if (success) {
+      console.log('❌ Reject response sent successfully');
+    } else {
+      Alert.alert(
+        'Error',
+        'Failed to send response. Please check your connection.',
+      );
+    }
 
     slideDownOrderUI();
     setTimeout(() => {
@@ -306,22 +329,105 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
         });
       });
     }, 600);
-  }, [navigation, slideDownOrderUI, isAnimating]);
+  }, [
+    navigation,
+    slideDownOrderUI,
+    isAnimating,
+    orderData,
+    socketService,
+    user,
+  ]);
 
+  // Listen for order assignment responses
   useEffect(() => {
-    // Simulate new order arrival after 2 seconds to let map stabilize
-    const timer = setTimeout(() => {
-      slideUpOrderUI();
-    }, 2000);
+    if (!orderData) return;
+
+    const unsubscribe = socketService.onOrderAssignmentResponse(data => {
+      console.log('📥 Order assignment response received:', data);
+      setOrderResponse(data);
+
+      if (data.type === 'ASSIGNED') {
+        // Order was successfully assigned
+        Alert.alert(
+          '✅ Success',
+          `Order ${data.orderId} has been assigned to you!`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                slideDownOrderUI();
+                setTimeout(() => {
+                  if (navigation && orderData) {
+                    // Navigate to PickupNavigation with order data
+                    const pickupLat = orderData.orderInfo.latitude
+                      ? parseFloat(orderData.orderInfo.latitude)
+                      : 17.43869444638263;
+                    const pickupLng = orderData.orderInfo.longitude
+                      ? parseFloat(orderData.orderInfo.longitude)
+                      : 78.39538337328888;
+
+                    navigation.navigate('PickupNavigation', {
+                      pickupLocation: {
+                        latitude: pickupLat,
+                        longitude: pickupLng,
+                        name: 'Store Location',
+                        address: orderData.orderInfo.formattedAddress,
+                        phoneNumber: '+91-9876543210',
+                      },
+                      driverLocation: driverLocation,
+                      orderId: orderData.orderId.toString(),
+                      orderNumber: orderData.orderNumber,
+                    });
+                  }
+                }, 600);
+              },
+            },
+          ],
+        );
+      } else if (data.type === 'DECLINED') {
+        Alert.alert('ℹ️ Info', `Order ${data.orderId} was declined.`);
+        // Navigate back
+        setTimeout(() => {
+          navigation?.goBack?.();
+        }, 1000);
+      } else if (data.type === 'ALREADY_ASSIGNED') {
+        Alert.alert(
+          '⚠️ Oops',
+          `Order ${data.orderId} was already assigned to another agent.`,
+        );
+        // Navigate back
+        setTimeout(() => {
+          navigation?.goBack?.();
+        }, 1000);
+      }
+    });
 
     return () => {
-      clearTimeout(timer);
-      // Cleanup animations to prevent memory leaks
+      // Cleanup is handled by the socket service
+    };
+  }, [orderData, socketService, navigation, driverLocation, slideDownOrderUI]);
+
+  useEffect(() => {
+    // Show order UI when order data is available
+    if (orderData) {
+      const timer = setTimeout(() => {
+        slideUpOrderUI();
+      }, 500);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+  }, [orderData, slideUpOrderUI]);
+
+  useEffect(() => {
+    // Cleanup animations on unmount
+    return () => {
       slideAnim.stopAnimation();
       fadeAnim.stopAnimation();
       scaleAnim.stopAnimation();
     };
-  }, [slideUpOrderUI, slideAnim, fadeAnim, scaleAnim]);
+  }, [slideAnim, fadeAnim, scaleAnim]);
 
   useEffect(() => {
     // First get current position to ensure permissions are granted
@@ -458,33 +564,23 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
             </View>
           </Marker>
 
-          <Marker
-            coordinate={{
-              latitude: 17.439840846539678,
-              longitude: 78.39049375456112,
-            }}
-            title="Customer Location"
-            pinColor="green"
-            anchor={{x: 0.5, y: 0.5}}
-            centerOffset={{x: 0, y: 0}}>
-            <View style={styles.markerContainer}>
-              <Icon name="home" size={32} color="green" />
-            </View>
-          </Marker>
           {/* Store location marker */}
-          <Marker
-            coordinate={{
-              latitude: 17.43869444638263,
-              longitude: 78.39538337328888,
-            }}
-            title={'SuperStart Golisoda Madhapur Store'}
-            pinColor="red"
-            anchor={{x: 0.5, y: 0.5}}
-            centerOffset={{x: 0, y: 0}}>
-            <View style={styles.markerContainer}>
-              <Icon name="store" size={32} color="red" />
-            </View>
-          </Marker>
+          {orderData?.orderInfo?.latitude &&
+            orderData?.orderInfo?.longitude && (
+              <Marker
+                coordinate={{
+                  latitude: parseFloat(orderData.orderInfo.latitude),
+                  longitude: parseFloat(orderData.orderInfo.longitude),
+                }}
+                title="Store Location"
+                pinColor="red"
+                anchor={{x: 0.5, y: 0.5}}
+                centerOffset={{x: 0, y: 0}}>
+                <View style={styles.markerContainer}>
+                  <Icon name="store" size={32} color="red" />
+                </View>
+              </Marker>
+            )}
         </MapView>
 
         <TouchableOpacity
@@ -516,9 +612,11 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
               </View>
 
               <Text style={styles.earningsLabel}>Estimated earnings</Text>
-              <Text style={styles.amount}>₹25</Text>
+              <Text style={styles.amount}>
+                ₹{orderData?.orderInfo?.totalAmount || '0'}
+              </Text>
               <Text style={styles.distances}>
-                Pickup: 0.91 kms | Drop: 1.51 kms
+                Order #{orderData?.orderNumber || 'N/A'}
               </Text>
 
               <View style={styles.card}>
@@ -526,15 +624,25 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
                   <Text style={styles.pickupTagText}>Pick up</Text>
                 </View>
                 <Text style={styles.restaurant}>
-                  SuperStart Golisoda Madhapur
+                  {orderData?.orderInfo?.formattedAddress
+                    ? 'Store Location'
+                    : 'Store Location'}
                 </Text>
                 <Text style={styles.address}>
-                  Plot 59, Guttala Begumpet, Madhapur, Hyderabad
+                  {orderData?.orderInfo?.formattedAddress ||
+                    'Address not available'}
                 </Text>
-                <View style={styles.row}>
-                  <Icon name="clock-outline" size={18} color="#6B7280" />
-                  <Text style={styles.away}> 2 mins away</Text>
-                </View>
+                {orderData?.orderInfo?.latitude &&
+                  orderData?.orderInfo?.longitude && (
+                    <View style={styles.row}>
+                      <Icon name="map-marker" size={18} color="#6B7280" />
+                      <Text style={styles.away}>
+                        {' '}
+                        {orderData.orderInfo.latitude},{' '}
+                        {orderData.orderInfo.longitude}
+                      </Text>
+                    </View>
+                  )}
               </View>
 
               <View style={styles.swipeContainer}>

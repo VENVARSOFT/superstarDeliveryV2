@@ -26,7 +26,7 @@ import {RFValue} from 'react-native-responsive-fontsize';
 import CustomInput from '@components/ui/CustomInput';
 import CustomButton from '@components/ui/CustomButton';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import socketService from '@service/socketService';
+
 const {height: screenHeight} = Dimensions.get('window');
 
 interface UserDetails {
@@ -102,48 +102,6 @@ const Profile = () => {
       }
     }
   }, [user?.idUser, user?.nbPhone]);
-
-  const handleNavigateToRideTracking = async () => {
-    try {
-      // Check if socket is already connected
-      const isConnected = socketService.getConnectionStatus();
-
-      if (!isConnected) {
-        // Get token and connect socket
-        const token = await tokenManager.getValidAccessToken();
-
-        if (!token) {
-          Alert.alert('Error', 'Authentication token not available');
-          return;
-        }
-
-        // Show loading indicator
-        setLoading(true);
-
-        const connected = await socketService.connect(token);
-
-        setLoading(false);
-
-        if (!connected) {
-          Alert.alert(
-            'Connection Error',
-            'Failed to connect to server. Please try again.',
-          );
-          return;
-        }
-      }
-
-      // Navigate to RideTrackingScreen
-      // Using a placeholder rideId - you may want to get this from active orders or user context
-      const rideId =
-        orders && orders.length > 0 ? orders[0]?.orderId : 'test-ride-id';
-      navigate('RideTracking', {rideId});
-    } catch (error) {
-      console.error('Error navigating to ride tracking:', error);
-      setLoading(false);
-      Alert.alert('Error', 'Failed to connect. Please try again.');
-    }
-  };
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -473,11 +431,6 @@ const Profile = () => {
               icon="gift"
               label="E-gift cards"
               onPress={() => navigate('RewardsScreen')}
-            />
-            <ActionButton
-              icon="map-marker"
-              label="Ride Tracking"
-              onPress={handleNavigateToRideTracking}
             />
 
             {/* Feeding India Section */}

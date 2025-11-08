@@ -11,7 +11,7 @@ import {
 import {useRoute, useNavigation} from '@react-navigation/native';
 import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
 import axios from 'axios';
-import socketService from '@service/socketService';
+
 import {tokenManager} from '@utils/tokenManager';
 import CustomText from '@components/ui/CustomText';
 import {Colors, Fonts} from '@utils/Constants';
@@ -61,74 +61,6 @@ const RideTrackingScreen = () => {
   const [deliverySuccessMessage, setDeliverySuccessMessage] = useState<
     string | null
   >(null);
-
-  // Initialize socket connection
-  useEffect(() => {
-    const initializeSocket = async () => {
-      try {
-        // Get token from tokenManager
-        const token =
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MDhkMGQwMDM3ZWVhMjg5Y2U2NzM0NCIsImlhdCI6MTc2MjI5MTI1MSwiZXhwIjoxNzY0ODgzMjUxfQ.8b9cf0q6XK74lZeBB9KS2usCG5HSEI8eCWXZwDg5VNA';
-
-        if (!token) {
-          Alert.alert('Error', 'Authentication token not available');
-          setLoading(false);
-          return;
-        }
-
-        const connected = await socketService.connect(token);
-
-        setIsConnected(connected);
-
-        if (connected) {
-          // Join ride room to receive updates
-          try {
-            await socketService.joinRide(rideId);
-          } catch (error) {
-            console.error('Error joining ride room:', error);
-            Alert.alert('Error', 'Failed to join ride room');
-          }
-
-          // Listen for ride status updates (accepted, ongoing, completed)
-          socketService.on('ride_update', handleRideUpdate);
-
-          // Listen for driver location updates
-          socketService.on('update_driver_location', handleDriverLocation);
-
-          // Listen for new messages
-          socketService.on('receive_message', handleNewMessage);
-
-          // Listen for errors
-          socketService.on('error', handleError);
-        }
-      } catch (error) {
-        console.error('Socket connection error:', error);
-        Alert.alert('Connection Error', 'Failed to connect to server');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (rideId) {
-      initializeSocket();
-    } else {
-      Alert.alert('Error', 'Ride ID is required');
-      setLoading(false);
-    }
-
-    // Cleanup on unmount
-    return () => {
-      socketService.off('ride_update', handleRideUpdate);
-      socketService.off('update_driver_location', handleDriverLocation);
-      socketService.off('receive_message', handleNewMessage);
-      socketService.off('error', handleError);
-
-      // Leave ride room
-      if (rideId) {
-        socketService.leaveRide(rideId);
-      }
-    };
-  }, [rideId]);
 
   // Call test socket API when delivery is successful
   const callTestSocketAPI = useCallback(async () => {

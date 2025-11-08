@@ -9,16 +9,11 @@ import {
   Platform,
   Animated as RNAnimated,
   Easing,
-  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
-import {
-  subscribeOrderAssignment,
-  respondAssignmentViaWebSocket,
-} from '@service/socketService';
+
 import {useAuthStore} from '@state/authStore';
-import {navigate} from '@utils/NavigationUtils';
 
 type Props = {
   route?: {
@@ -122,134 +117,6 @@ const OrderAssignmentScreen: FC<Props> = ({route, navigation}) => {
     }, 100);
   }, [slideAnim, fadeAnim, scaleAnim, isAnimating, navigation]);
 
-  // Subscribe to WebSocket for order assignment
-  useEffect(() => {
-    if (!orderId) {
-      Alert.alert('Error', 'Order ID is required');
-      return;
-    }
-
-    console.log('Subscribing to order assignment for orderId:', orderId);
-
-    const unsubscribe = subscribeOrderAssignment(orderId, data => {
-      console.log('Received order assignment data:', data);
-
-      if (data && data.requested) {
-        setOrderData(data);
-        setStatus('New Delivery Request Received 🚚');
-        // Trigger slide-up animation
-        setTimeout(() => {
-          slideUpOrderUI();
-        }, 500);
-      }
-    });
-
-    return () => {
-      console.log('Unsubscribing from order assignment');
-      unsubscribe();
-    };
-  }, [orderId, slideUpOrderUI]);
-
-  const handleResponse = useCallback(
-    async (response: 'YES' | 'NO') => {
-      if (hasResponded) {
-        return;
-      }
-
-      if (!orderId || !deliveryAgentId) {
-        Alert.alert('Error', 'Missing order ID or delivery agent ID');
-        return;
-      }
-
-      try {
-        setHasResponded(true);
-        // Use WebSocket to respond to order assignment
-        const result = await respondAssignmentViaWebSocket(
-          orderId,
-          deliveryAgentId,
-          response,
-        );
-
-        if (result) {
-          setStatus(response === 'YES' ? 'Accepted ✅' : 'Rejected ❌');
-
-          // Success animation
-          RNAnimated.parallel([
-            RNAnimated.timing(scaleAnim, {
-              toValue: 1.05,
-              duration: 150,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: true,
-            }),
-            RNAnimated.timing(fadeAnim, {
-              toValue: 0.8,
-              duration: 150,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            // Reset and then slide down
-            RNAnimated.parallel([
-              RNAnimated.timing(scaleAnim, {
-                toValue: 1,
-                duration: 100,
-                easing: Easing.in(Easing.quad),
-                useNativeDriver: true,
-              }),
-              RNAnimated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 100,
-                easing: Easing.in(Easing.quad),
-                useNativeDriver: true,
-              }),
-            ]).start();
-          });
-
-          // Slide down after delay
-          setTimeout(() => {
-            slideDownOrderUI();
-          }, 800);
-
-          if (response === 'YES') {
-            // Navigate to pickup navigation after acceptance
-            setTimeout(() => {
-              navigate('PickupNavigation', {
-                pickupLocation: orderData?.pickupLocation || {
-                  latitude: 17.43869444638263,
-                  longitude: 78.39538337328888,
-                  name: 'Store Location',
-                  address: 'Pickup Address',
-                  phoneNumber: '+91-9876543210',
-                },
-                driverLocation: orderData?.driverLocation || {
-                  latitude: 17.442,
-                  longitude: 78.391,
-                },
-                orderId: orderId,
-              });
-            }, 1500);
-          }
-        } else {
-          setHasResponded(false);
-          Alert.alert('Error', 'Failed to send response. Please try again.');
-        }
-      } catch (error) {
-        setHasResponded(false);
-        console.error('Error responding to assignment:', error);
-        Alert.alert('Error', 'Failed to send response. Please try again.');
-      }
-    },
-    [
-      orderId,
-      deliveryAgentId,
-      hasResponded,
-      slideDownOrderUI,
-      orderData,
-      scaleAnim,
-      fadeAnim,
-    ],
-  );
-
   useEffect(() => {
     // Cleanup animations on unmount
     return () => {
@@ -338,7 +205,6 @@ const OrderAssignmentScreen: FC<Props> = ({route, navigation}) => {
               <View style={styles.buttonContainer}>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.acceptButton]}
-                  onPress={() => handleResponse('YES')}
                   disabled={hasResponded || isAnimating}
                   activeOpacity={0.8}>
                   <Icon name="check" size={24} color="white" />
@@ -347,7 +213,6 @@ const OrderAssignmentScreen: FC<Props> = ({route, navigation}) => {
 
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}
-                  onPress={() => handleResponse('NO')}
                   disabled={hasResponded || isAnimating}
                   activeOpacity={0.8}>
                   <Icon name="close" size={24} color="white" />
