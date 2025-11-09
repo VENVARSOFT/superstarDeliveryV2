@@ -232,75 +232,75 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     [],
   );
 
-  // Send location update to socket
-  const sendLocationUpdate = useCallback(
-    (
-      location: DriverLocation,
-      position: any,
-      orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' = 'IN_TRANSIT',
-      forceSend: boolean = false,
-    ) => {
-      // Check connection status dynamically instead of relying on state
-      const isConnected = socketService.getConnectionStatus();
+    // Send location update to socket
+    const sendLocationUpdate = useCallback(
+      (
+        location: DriverLocation,
+        position: any,
+        orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' = 'IN_TRANSIT',
+        forceSend: boolean = false,
+      ) => {
+        // Check connection status dynamically instead of relying on state
+        const isConnected = socketService.getConnectionStatus();
 
-      // Debug logging
-      if (!isConnected) {
-        console.log('⚠️ Socket not connected, skipping location update');
-        return;
-      }
-
-      if (!orderId) {
-        console.log('⚠️ OrderId not available, skipping location update');
-        return;
-      }
-
-      if (!user?.idUser) {
-        console.log('⚠️ User ID not available, skipping location update');
-        return;
-      }
-
-      const now = Date.now();
-      // Send location update every 5 seconds (unless forced)
-      if (!forceSend && now - lastSocketLocationUpdate.current < 5000) {
-        return;
-      }
-
-      // Extract coordinates from position or use location directly
-      const latitude = position?.coords?.latitude ?? location.latitude;
-      const longitude = position?.coords?.longitude ?? location.longitude;
-      const accuracy = position?.coords?.accuracy ?? 0;
-      const speed = position?.coords?.speed ?? 0;
-
-      const locationData = {
-        orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
-        deliveryAgentId: user.idUser as number,
-        latitude: latitude,
-        longitude: longitude,
-        timestamp: now,
-        orderStatus: orderStatus,
-        accuracy: accuracy || 0,
-        speed: speed || 0,
-      };
-
-      console.log(`📤 Attempting to emit location_update with status ${orderStatus}:`, locationData);
-
-      try {
-        const success = socketService.emit('location_update', locationData);
-
-        if (success) {
-          lastSocketLocationUpdate.current = now;
-          console.log(`✅ Location update sent successfully with status: ${orderStatus}`);
-        } else {
-          console.warn(
-            '⚠️ Failed to send location update to socket - emit returned false',
-          );
+        // Debug logging
+        if (!isConnected) {
+          console.log('⚠️ Socket not connected, skipping location update');
+          return;
         }
-      } catch (err) {
-        console.error('❌ Error sending location update:', err);
-      }
-    },
-    [orderId, user?.idUser, socketService],
-  );
+
+        if (!orderId) {
+          console.log('⚠️ OrderId not available, skipping location update');
+          return;
+        }
+
+        if (!user?.idUser) {
+          console.log('⚠️ User ID not available, skipping location update');
+          return;
+        }
+
+        const now = Date.now();
+        // Send location update every 5 seconds (unless forced)
+        if (!forceSend && now - lastSocketLocationUpdate.current < 5000) {
+          return;
+        }
+
+        // Extract coordinates from position or use location directly
+        const latitude = position?.coords?.latitude ?? location.latitude;
+        const longitude = position?.coords?.longitude ?? location.longitude;
+        const accuracy = position?.coords?.accuracy ?? 0;
+        const speed = position?.coords?.speed ?? 0;
+
+        const locationData = {
+          orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
+          deliveryAgentId: user.idUser as number,
+          latitude: latitude,
+          longitude: longitude,
+          timestamp: now,
+          orderStatus: orderStatus,
+          accuracy: accuracy || 0,
+          speed: speed || 0,
+        };
+
+        console.log(`📤 Attempting to emit location_update with status ${orderStatus}:`, locationData);
+
+        try {
+          const success = socketService.emit('location_update', locationData);
+
+          if (success) {
+            lastSocketLocationUpdate.current = now;
+            console.log(`✅ Location update sent successfully with status: ${orderStatus}`);
+          } else {
+            console.warn(
+              '⚠️ Failed to send location update to socket - emit returned false',
+            );
+          }
+        } catch (err) {
+          console.error('❌ Error sending location update:', err);
+        }
+      },
+      [orderId, user?.idUser, socketService],
+    );
 
 
 

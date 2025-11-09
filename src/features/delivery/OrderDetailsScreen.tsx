@@ -10,6 +10,7 @@ import {
   Vibration,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -25,10 +26,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import Haptic from 'react-native-haptic-feedback';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Geolocation from '@react-native-community/geolocation';
 import {Fonts} from '@utils/Constants';
 import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
 import {getOrderDetails, OrderDetailsResponse} from '@service/orderService';
+import {useWS} from '@service/WsProvider';
+import {USER_TYPES} from '@service/config';
 
 type Props = {
   route?: any;
@@ -47,6 +51,9 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   // Get user from Redux
   const user = useSelector((state: RootState) => state.auth.user);
+
+  // Socket service
+  const socketService = useWS();
 
   // Swipe to confirm values
   const translateX = useSharedValue(0);
@@ -91,6 +98,49 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
     fetchOrderDetails();
   }, [orderId, user?.idUser]);
+
+  // Initialize socket connection and monitor connection status
+  useEffect(() => {
+    // Monitor socket connection status
+    const unsubscribe = socketService.onConnectionChange(connected => {
+      console.log(
+        'Socket connection status:',
+        connected ? '🟢 Connected' : '🔴 Disconnected',
+      );
+    });
+
+    // Connect socket if not already connected
+    const connectSocket = async () => {
+      if (!socketService.getConnectionStatus() && user?.idUser) {
+        try {
+          // Note: fkStoreId might not be in Redux User interface
+          // If socket connection requires storeId, you may need to get it from orderData
+          const storeId = orderData?.fkIdStoreDelivery || orderData?.storeDTO?.idStore;
+          
+          if (storeId) {
+            await socketService.connect(undefined, {
+              userId: user.idUser as number,
+              userType: USER_TYPES.DELIVERY_PARTNER,
+              storeId: storeId as number,
+            });
+            console.log('✅ Socket connected for order details');
+          } else {
+            console.log('⚠️ Store ID not available, socket may already be connected');
+          }
+        } catch (error) {
+          console.error('❌ Failed to connect socket:', error);
+        }
+      } else if (socketService.getConnectionStatus()) {
+        console.log('✅ Socket already connected');
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.idUser, orderData?.fkIdStoreDelivery, orderData?.storeDTO?.idStore, socketService]);
 
   // Transform API data to UI format
   const orderDetails = useMemo(() => {
@@ -176,25 +226,142 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
     [],
   );
 
+  // Get current location
+  const getCurrentLocation = useCallback((): Promise<{latitude: number; longitude: number}> => {
+    return new Promise((resolve, reject) => {
+      Geolocation.getCurrentPosition(
+        position => {
+          const {latitude, longitude} = position.coords;
+          resolve({latitude, longitude});
+        },
+        error => {
+          console.error('Location error:', error);
+          reject(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 1000,
+        },
+      );
+    });
+  }, []);
+
+  // Send location update to socket
+  const sendLocationUpdate = useCallback(
+    (
+      location: {latitude: number; longitude: number},
+      position: any,
+      orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' | 'PICKED' = 'IN_TRANSIT',
+      forceSend: boolean = false,
+    ) => {
+      // Check connection status dynamically
+      const isConnected = socketService.getConnectionStatus();
+
+      // Debug logging
+      if (!isConnected) {
+        console.log('⚠️ Socket not connected, skipping location update');
+        return;
+      }
+
+      // Use orderId from orderData if available, otherwise from route params
+      const currentOrderId = orderData?.idOrder || orderId;
+      if (!currentOrderId) {
+        console.log('⚠️ OrderId not available, skipping location update');
+        return;
+      }
+
+      if (!user?.idUser) {
+        console.log('⚠️ User ID not available, skipping location update');
+        return;
+      }
+
+      // Extract coordinates from position or use location directly
+      const latitude = position?.coords?.latitude ?? location.latitude;
+      const longitude = position?.coords?.longitude ?? location.longitude;
+      const accuracy = position?.coords?.accuracy ?? 0;
+      const speed = position?.coords?.speed ?? 0;
+      const now = Date.now();
+
+      const locationData = {
+        orderId: typeof currentOrderId === 'string' ? parseInt(currentOrderId, 10) : currentOrderId,
+        deliveryAgentId: user.idUser as number,
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: now,
+        orderStatus: orderStatus,
+        accuracy: accuracy || 0,
+        speed: speed || 0,
+      };
+
+      console.log(`📤 Attempting to emit location_update with status ${orderStatus}:`, locationData);
+
+      try {
+        const success = socketService.emit('location_update', locationData);
+
+        if (success) {
+          console.log(`✅ Location update sent successfully with status: ${orderStatus}`);
+        } else {
+          console.warn(
+            '⚠️ Failed to send location update to socket - emit returned false',
+          );
+        }
+      } catch (err) {
+        console.error('❌ Error sending location update:', err);
+      }
+    },
+    [orderId, orderData?.idOrder, user?.idUser, socketService],
+  );
+
   const onPickedUp = useCallback(async () => {
+    console.log('=== onPickedUp called ===');
     console.log('Order picked up confirmed');
-    if (isAnimating || !orderDetails) return;
+    if (isAnimating || !orderData) return;
     setIsAnimating(true);
+
+    // Get current location to send with PICKED status
+    try {
+      const currentLocation = await getCurrentLocation();
+      
+      // Send location update with PICKED status immediately (force send)
+      sendLocationUpdate(
+        currentLocation,
+        {coords: {latitude: currentLocation.latitude, longitude: currentLocation.longitude}},
+        'PICKED',
+        true, // forceSend = true to bypass any throttling
+      );
+      
+      console.log('✅ PICKED status sent with current coordinates');
+    } catch (error) {
+      console.error('❌ Error getting current location for PICKED status:', error);
+      // If we can't get location, still try to send with default coordinates
+      // You might want to use orderData coordinates as fallback
+      if (orderData?.txLatitude && orderData?.txLongitude) {
+        sendLocationUpdate(
+          {
+            latitude: parseFloat(orderData.txLatitude),
+            longitude: parseFloat(orderData.txLongitude),
+          },
+          null,
+          'PICKED',
+          true,
+        );
+      }
+    }
 
     // Enhanced success haptic feedback
     triggerHaptic('success');
     Vibration.vibrate([0, 50, 100, 50, 100]);
 
-    // Simulate API call
+    // Navigate to drop order screen
     setTimeout(() => {
-      // Navigate to drop order screen
       navigation?.navigate('DropOrder', {
         orderDetails: orderDetails,
         orderId: orderId,
       });
       setIsAnimating(false);
     }, 800);
-  }, [navigation, orderDetails, orderId, isAnimating, triggerHaptic]);
+  }, [navigation, orderDetails, orderId, orderData, isAnimating, triggerHaptic, getCurrentLocation, sendLocationUpdate]);
 
   const panHandler = useAnimatedGestureHandler({
     onStart: () => {
