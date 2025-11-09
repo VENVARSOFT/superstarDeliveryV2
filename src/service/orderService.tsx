@@ -347,3 +347,137 @@ export const getStoreDetails = async (
     return null;
   }
 };
+
+// Interface for order details response
+export interface OrderDetailsResponse {
+  data: {
+    cdPaymentType: string;
+    customerDTO: any;
+    deliveryAddress: {
+      dtCreated: string | null;
+      dtUpdated: string | null;
+      flFavorite: boolean;
+      idAddress: number;
+      idTenant: number;
+      idUser: number;
+      idUserCreated: number | null;
+      idUserUpdated: number | null;
+      txAddressLine1: string;
+      txAddressLine2: string | null;
+      txAddressType: string | null;
+      txCity: string;
+      txCountry: string;
+      txFormattedAddress: string | null;
+      txLandmark: string | null;
+      txLatitude: string | null;
+      txLongitude: string | null;
+      txPhone: string;
+      txPostalCode: string;
+      txState: string;
+    };
+    deliveryAgentDTO: any;
+    deliverySlot: {
+      dtCreated: string | null;
+      dtSlotDate: string;
+      dtUpdated: string | null;
+      idSlot: number;
+      idTenant: number;
+      idUserCreated: number | null;
+      idUserUpdated: number | null;
+      isAvailable: boolean;
+      tmEndTime: string;
+      tmStartTime: string;
+    };
+    dtCreated: string;
+    dtUpdated: string;
+    fkIdAddressDelivery: number;
+    fkIdSlotDelivery: number;
+    fkIdStoreDelivery: number;
+    fkIdUserDelivery: number;
+    idOrder: number;
+    idTenant: number;
+    idUser: number;
+    idUserCreated: number;
+    idUserUpdated: number;
+    nbDeliveryCharge: number;
+    nbGstCharge: number;
+    nbHandlingCharge: number;
+    nbSurgeCharge: number;
+    nbTotalAmount: number;
+    orderItems: Array<{
+      dtCreated: string;
+      idOrder: number;
+      idOrderItem: number;
+      idProduct: number;
+      idTenant: number | null;
+      idUserCreated: number | null;
+      nbPrice: number;
+      nbQuantity: number;
+      nbSubtotal: number;
+      productDescription: string;
+      productImageUrl: string;
+      txProductName: string;
+    }>;
+    status: string;
+    storeDTO: {
+      distanceKm: number | null;
+      dtCreated: string;
+      dtUpdated: string;
+      flActive: boolean;
+      flDelete: boolean;
+      idStore: number;
+      idTenant: number;
+      idUserCreated: number;
+      idUserUpdated: number;
+      nbDeliveryRadius: number | null;
+      nbStoreSize: number;
+      nmManager: string;
+      nmStore: string;
+      tmClosingTime: string;
+      tmOpeningTime: string;
+      txAddress: string;
+      txCity: string;
+      txDeliverySettings: string | null;
+      txDescription: string | null;
+      txEmail: string;
+      txFeatures: string | null;
+      txLatitude: string;
+      txLogoUrl: string | null;
+      txLongitude: string;
+      txPaymentMethods: string | null;
+      txPhone: string;
+      txPinCode: string;
+      txState: string;
+      txStoreLocation: string;
+      txStoreType: string;
+      txZipCode: string | null;
+    };
+    txCurLatitude: string;
+    txCurLongitude: string;
+    txFormattedAddress: string;
+    txLatitude: string;
+    txLongitude: string;
+    txOrderNumber: string;
+    txPinCodeDelivery: string;
+  };
+  error: string | null;
+  status: string;
+  success: boolean;
+}
+
+// API function to get order details
+export const getOrderDetails = async (
+  idOrder: number,
+  idUser: number,
+): Promise<OrderDetailsResponse | null> => {
+  try {
+    const response = await appAxios.post('/orders/getOrderDetails', {
+      idOrder,
+      idUser,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching order details:', error);
+    return null;
+  }
+};

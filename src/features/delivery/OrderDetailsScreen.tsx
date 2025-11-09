@@ -1,4 +1,4 @@
-import React, {useCallback, useState, useMemo} from 'react';
+import React, {useCallback, useState, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   Vibration,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -25,6 +26,9 @@ import Animated, {
 import Haptic from 'react-native-haptic-feedback';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
+import {useSelector} from 'react-redux';
+import type {RootState} from '@state/store';
+import {getOrderDetails, OrderDetailsResponse} from '@service/orderService';
 
 type Props = {
   route?: any;
@@ -37,34 +41,113 @@ const SWIPE_THRESHOLD = width * 0.7; // 70%
 
 const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
   const [isAnimating, setIsAnimating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [orderData, setOrderData] = useState<OrderDetailsResponse['data'] | null>(null);
+
+  // Get user from Redux
+  const user = useSelector((state: RootState) => state.auth.user);
 
   // Swipe to confirm values
   const translateX = useSharedValue(0);
 
-  // Get order details from route params
-  const orderDetails = useMemo(
-    () =>
-      route?.params?.orderDetails || {
-        orderId: 'ORDER_123456',
-        customerName: 'John Doe',
-        customerPhone: '+91-9876543210',
-        customerAddress: '123 Main Street, Hyderabad, Telangana 500001',
-        restaurantName: 'SuperStart Golisoda Madhapur',
-        restaurantAddress: 'Plot 59, Guttala Begumpet, Madhapur, Hyderabad',
-        items: [
-          {name: 'Chicken Biryani', quantity: 2, price: 180},
-          {name: 'Mutton Curry', quantity: 1, price: 120},
-          {name: 'Raita', quantity: 2, price: 40},
-        ],
-        totalAmount: 340,
-        deliveryFee: 25,
-        estimatedEarnings: 25,
-        estimatedTime: '15-20 mins',
-        specialInstructions:
-          'Please call when you arrive. Ring the doorbell twice.',
-      },
-    [route?.params?.orderDetails],
-  );
+  // Get orderId from route params - can be passed as orderId or idOrder
+  const orderId =
+    route?.params?.orderId ||
+    route?.params?.idOrder ||
+    route?.params?.orderDetails?.orderId ||
+    route?.params?.orderDetails?.idOrder;
+
+  // Fetch order details from API
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (!orderId || !user?.idUser) {
+        setError('Order ID or User ID is missing');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getOrderDetails(
+          typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
+          user.idUser,
+        );
+        console.log('Order details response:', response);
+
+        if (response && response.success && response.data) {
+          setOrderData(response.data);
+        } else {
+          setError(response?.error || 'Failed to fetch order details');
+        }
+      } catch (err) {
+        console.error('Error fetching order details:', err);
+        setError('An error occurred while fetching order details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetails();
+  }, [orderId, user?.idUser]);
+
+  // Transform API data to UI format
+  const orderDetails = useMemo(() => {
+    if (!orderData) {
+      return null;
+    }
+
+    // Format customer name from customerDTO or use default
+    const customerName =
+      orderData.customerDTO?.nmFirst && orderData.customerDTO?.nmLast
+        ? `${orderData.customerDTO.nmFirst} ${orderData.customerDTO.nmLast}`
+        : orderData.customerDTO?.nmFirst || 'Customer';
+
+    // Format customer phone
+    const customerPhone = orderData.deliveryAddress?.txPhone || 'N/A';
+
+    // Format customer address
+    const addressParts = [
+      orderData.deliveryAddress?.txAddressLine1,
+      orderData.deliveryAddress?.txAddressLine2,
+      orderData.deliveryAddress?.txLandmark,
+      orderData.deliveryAddress?.txCity,
+      orderData.deliveryAddress?.txState,
+      orderData.deliveryAddress?.txPostalCode,
+    ].filter(Boolean);
+    const customerAddress = addressParts.join(', ') || orderData.txFormattedAddress || 'N/A';
+
+    // Format restaurant name and address
+    const restaurantName = orderData.storeDTO?.nmStore || 'Restaurant';
+    const restaurantAddress = orderData.storeDTO?.txAddress || 'N/A';
+
+    // Transform order items
+    const items = orderData.orderItems.map(item => ({
+      name: item.txProductName,
+      quantity: item.nbQuantity,
+      price: item.nbPrice,
+    }));
+
+    // Calculate estimated time (you can adjust this logic)
+    const estimatedTime = '15-20 mins'; // You can calculate this based on deliverySlot or other data
+
+    return {
+      orderId: orderData.txOrderNumber || `#${orderData.idOrder}`,
+      customerName,
+      customerPhone,
+      customerAddress,
+      restaurantName,
+      restaurantAddress,
+      items,
+      totalAmount: orderData.nbTotalAmount,
+      deliveryFee: orderData.nbDeliveryCharge,
+      estimatedEarnings: orderData.nbDeliveryCharge, // You can adjust this
+      estimatedTime,
+      specialInstructions: orderData.deliveryAddress?.txLandmark || null,
+      status: orderData.status,
+    };
+  }, [orderData]);
 
   // Simplified haptic feedback functions
   const triggerHaptic = useCallback(
@@ -95,7 +178,7 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const onPickedUp = useCallback(async () => {
     console.log('Order picked up confirmed');
-    if (isAnimating) return;
+    if (isAnimating || !orderDetails) return;
     setIsAnimating(true);
 
     // Enhanced success haptic feedback
@@ -107,10 +190,11 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
       // Navigate to drop order screen
       navigation?.navigate('DropOrder', {
         orderDetails: orderDetails,
+        orderId: orderId,
       });
       setIsAnimating(false);
     }, 800);
-  }, [navigation, orderDetails, isAnimating, triggerHaptic]);
+  }, [navigation, orderDetails, orderId, isAnimating, triggerHaptic]);
 
   const panHandler = useAnimatedGestureHandler({
     onStart: () => {
@@ -187,13 +271,93 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
 
   const handleCallCustomer = useCallback(() => {
     // Implement call customer functionality
-    console.log('Calling customer:', orderDetails.customerPhone);
-  }, [orderDetails.customerPhone]);
+    if (orderDetails?.customerPhone) {
+      console.log('Calling customer:', orderDetails.customerPhone);
+      // You can use Linking.openURL(`tel:${orderDetails.customerPhone}`) here
+    }
+  }, [orderDetails?.customerPhone]);
 
   const handleCallRestaurant = useCallback(() => {
     // Implement call restaurant functionality
-    console.log('Calling restaurant');
-  }, []);
+    if (orderData?.storeDTO?.txPhone) {
+      console.log('Calling restaurant:', orderData.storeDTO.txPhone);
+      // You can use Linking.openURL(`tel:${orderData.storeDTO.txPhone}`) here
+    }
+  }, [orderData?.storeDTO?.txPhone]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <GestureHandlerRootView style={styles.gestureContainer}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
+              <Icon name="chevron-left" size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Order Details</Text>
+            <View style={styles.headerActions} />
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={PRIMARY_GREEN} />
+            <Text style={styles.loadingText}>Loading order details...</Text>
+          </View>
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Show error state
+  if (error || !orderDetails) {
+    return (
+      <GestureHandlerRootView style={styles.gestureContainer}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
+              <Icon name="chevron-left" size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Order Details</Text>
+            <View style={styles.headerActions} />
+          </View>
+          <View style={styles.errorContainer}>
+            <Icon name="alert-circle" size={48} color="#EF4444" />
+            <Text style={styles.errorText}>
+              {error || 'Failed to load order details'}
+            </Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                if (orderId && user?.idUser) {
+                  setLoading(true);
+                  setError(null);
+                  getOrderDetails(
+                    typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
+                    user.idUser,
+                  )
+                    .then(response => {
+                      if (response && response.success && response.data) {
+                        setOrderData(response.data);
+                      } else {
+                        setError(response?.error || 'Failed to fetch order details');
+                      }
+                    })
+                    .catch(err => {
+                      console.error('Error fetching order details:', err);
+                      setError('An error occurred while fetching order details');
+                    })
+                    .finally(() => {
+                      setLoading(false);
+                    });
+                }
+              }}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={styles.gestureContainer}>
@@ -222,12 +386,20 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
             <View style={styles.statusHeader}>
               <View style={styles.statusTag}>
                 <Icon name="package-variant" size={16} color="white" />
-                <Text style={styles.statusTagText}>Order Ready</Text>
+                <Text style={styles.statusTagText}>
+                  {orderData?.status === 'IN_TRANSIT'
+                    ? 'In Transit'
+                    : orderData?.status === 'PICKED_UP'
+                    ? 'Picked Up'
+                    : orderData?.status === 'DELIVERED'
+                    ? 'Delivered'
+                    : 'Order Ready'}
+                </Text>
               </View>
-              <Text style={styles.orderId}>#{orderDetails.orderId}</Text>
+              <Text style={styles.orderId}>{orderData?.txOrderNumber}</Text>
             </View>
             <Text style={styles.estimatedTime}>
-              Estimated pickup time: {orderDetails.estimatedTime}
+              Estimated pickup time: {orderData?.deliverySlot?.tmStartTime}
             </Text>
           </View>
 
@@ -241,10 +413,10 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
                 <View style={styles.customerDetails}>
                   <Text style={styles.customerName}>
-                    {orderDetails.customerName}
+                    {orderData?.customerDTO?.nmCustomer}
                   </Text>
                   <Text style={styles.customerPhone}>
-                    {orderDetails.customerPhone}
+                    {orderData?.customerDTO?.txPhone}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -256,14 +428,14 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
               <View style={styles.addressContainer}>
                 <Icon name="map-marker" size={16} color="#6B7280" />
                 <Text style={styles.address}>
-                  {orderDetails.customerAddress}
+                  {orderData?.txFormattedAddress}
                 </Text>
               </View>
-              {orderDetails.specialInstructions && (
+              {orderData?.deliveryAddress?.txLandmark && (
                 <View style={styles.instructionsContainer}>
                   <Icon name="information" size={16} color="#F59E0B" />
                   <Text style={styles.instructions}>
-                    {orderDetails.specialInstructions}
+                    {orderData?.deliveryAddress?.txLandmark}
                   </Text>
                 </View>
               )}
@@ -280,10 +452,10 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 </View>
                 <View style={styles.restaurantDetails}>
                   <Text style={styles.restaurantName}>
-                    {orderDetails.restaurantName}
+                    {orderData?.storeDTO?.nmStore}
                   </Text>
                   <Text style={styles.restaurantAddress}>
-                    {orderDetails.restaurantAddress}
+                    {orderData?.storeDTO?.txAddress}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -299,36 +471,36 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Order Items</Text>
             <View style={styles.card}>
-              {orderDetails.items.map((item: any, index: number) => (
+              {orderData?.orderItems.map((item: any, index: number) => (
                 <View key={index} style={styles.orderItem}>
                   <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemName}>{item.txProductName}</Text>
                     <Text style={styles.itemQuantity}>
-                      Qty: {item.quantity}
+                      Qty: {item.nbQuantity}
                     </Text>
                   </View>
-                  <Text style={styles.itemPrice}>₹{item.price}</Text>
+                  <Text style={styles.itemPrice}>₹{item.nbPrice}</Text>
                 </View>
               ))}
               <View style={styles.orderTotal}>
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Subtotal</Text>
                   <Text style={styles.totalValue}>
-                    ₹{orderDetails.totalAmount}
+                    ₹{orderData?.nbTotalAmount}
                   </Text>
                 </View>
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Delivery Fee</Text>
                   <Text style={styles.totalValue}>
-                    ₹{orderDetails.deliveryFee}
+                    ₹{orderData?.nbDeliveryCharge}
                   </Text>
                 </View>
                 <View style={[styles.totalRow, styles.finalTotal]}>
                   <Text style={styles.finalTotalLabel}>Total</Text>
                   <Text style={styles.finalTotalValue}>
-                    ₹{orderDetails.totalAmount + orderDetails.deliveryFee}
+                    ₹{(orderData?.nbTotalAmount || 0) + (orderData?.nbDeliveryCharge || 0)}
                   </Text>
-                </View>
+                </View> 
               </View>
             </View>
           </View>
@@ -341,7 +513,7 @@ const OrderDetailsScreen: React.FC<Props> = ({navigation, route}) => {
                 <Text style={styles.earningsTitle}>Your Earnings</Text>
               </View>
               <Text style={styles.earningsAmount}>
-                ₹{orderDetails.estimatedEarnings}
+                ₹{orderData?.nbDeliveryCharge}
               </Text>
               <Text style={styles.earningsNote}>Estimated delivery fee</Text>
             </View>
@@ -680,6 +852,44 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: Fonts.Medium,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: Fonts.Medium,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: PRIMARY_GREEN,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: Fonts.SemiBold,
   },
 });
 
