@@ -290,3 +290,60 @@ export const respondAssignment = async (
     return null;
   }
 };
+
+// Interface for store details response
+export interface StoreDetailsResponse {
+  data: {
+    distanceKm: number | null;
+    dtCreated: string;
+    dtUpdated: string;
+    flActive: boolean;
+    flDelete: boolean;
+    idStore: number;
+    idTenant: number;
+    idUserCreated: number;
+    idUserUpdated: number;
+    nbDeliveryRadius: number | null;
+    nbStoreSize: number;
+    nmManager: string;
+    nmStore: string;
+    tmClosingTime: string;
+    tmOpeningTime: string;
+    txAddress: string;
+    txCity: string;
+    txDeliverySettings: string | null;
+    txDescription: string | null;
+    txEmail: string;
+    txFeatures: string | null;
+    txLatitude: string;
+    txLogoUrl: string | null;
+    txLongitude: string;
+    txPaymentMethods: string | null;
+    txPhone: string;
+    txPinCode: string;
+    txState: string;
+    txStoreLocation: string;
+    txStoreType: string;
+    txZipCode: string | null;
+  };
+  error: string | null;
+  status: string;
+  success: boolean;
+}
+
+// API function to get store details by ID
+export const getStoreDetails = async (
+  idStore: number,
+  idTenant: number = 1,
+): Promise<StoreDetailsResponse | null> => {
+  try {
+    const response = await appAxios.post('/stores/getStoreById', {
+      idStore,
+      idTenant,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching store details:', error);
+    return null;
+  }
+};

@@ -277,6 +277,10 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
 
         if (success) {
           lastSocketLocationUpdate.current = now;
+          socketService.on('location_update', (data)=>{
+            console.log('KK_6------------------------->', data)
+            
+          });
           Alert.alert('Location update sent to socket successfully');
         } else {
           console.warn(

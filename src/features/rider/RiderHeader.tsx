@@ -74,7 +74,7 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
             heading: heading as number,
           });
 
-          setOnDuty(true);
+          setOnDuty(!onDuty);
         },
         error => {
           if (error.code === 1) {

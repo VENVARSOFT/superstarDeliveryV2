@@ -12,17 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-} from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
 import Geolocation from '@react-native-community/geolocation';
@@ -30,6 +20,7 @@ import {watchLocation, clearLocationWatch} from '@service/directionsService';
 import {useWS, OrderAssignmentRequest} from '@service/WsProvider';
 import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
+import { getStoreDetails } from '@service/orderService';
 
 Geolocation.setRNConfiguration?.({
   skipPermissionRequests: false,
@@ -45,12 +36,13 @@ type Props = {
 
 const {width, height} = Dimensions.get('window');
 const PRIMARY_GREEN = '#00A86B';
-const ACCEPT_THRESHOLD = width * 0.7; // 70%
 
 const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   // Get order data from route params
   const orderData: OrderAssignmentRequest | undefined =
     route?.params?.orderData;
+
+ 
   const socketService = useWS();
   const user = useSelector((state: RootState) => state.auth.user);
 
@@ -63,8 +55,8 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     longitude: route?.params?.driverLng ?? 78.391,
   });
 
-  console.log('driverLocation', driverLocation);
-  console.log('orderData', orderData);
+  // console.log('driverLocation', driverLocation);
+  // console.log('orderData', orderData);
 
   const [watchId, setWatchId] = useState<number | null>(null);
   const slideAnim = useRef(new RNAnimated.Value(0)).current;
@@ -81,8 +73,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     [driverLocation.latitude, driverLocation.longitude],
   );
 
-  // Swipe to accept values
-  const translateX = useSharedValue(0);
 
   const slideUpOrderUI = useCallback(() => {
     if (isAnimating) return;
@@ -154,12 +144,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   }, [slideAnim, fadeAnim, scaleAnim, isAnimating]);
 
   const onAccept = useCallback(async () => {
-    console.log(
-      'onAccept called - accepted:',
-      accepted,
-      'isAnimating:',
-      isAnimating,
-    );
+   
     if (accepted || isAnimating || !orderData) return;
     setAccepted(true);
     console.log('Order accepted, sending response...');
@@ -227,79 +212,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     fadeAnim,
   ]);
 
-  const panHandler = useAnimatedGestureHandler({
-    onStart: () => {
-      console.log('Gesture started');
-      // Simplified start - no haptic to avoid runOnJS conflicts
-    },
-    onActive: e => {
-      try {
-        const newTranslateX = Math.max(
-          0,
-          Math.min(e.translationX, ACCEPT_THRESHOLD),
-        );
-        translateX.value = newTranslateX;
-        // Removed progressive haptic feedback to prevent runOnJS conflicts
-      } catch (error) {
-        console.log('Gesture active error:', error);
-      }
-    },
-    onEnd: () => {
-      try {
-        const currentTranslateX = translateX.value;
-        console.log(
-          'Gesture ended - currentTranslateX:',
-          currentTranslateX,
-          'threshold:',
-          ACCEPT_THRESHOLD * 0.85,
-        );
-        if (currentTranslateX >= ACCEPT_THRESHOLD * 0.85) {
-          console.log('Gesture threshold reached, calling onAccept...');
-          // Simplified success handling with error protection
-          translateX.value = withTiming(
-            ACCEPT_THRESHOLD,
-            {duration: 200},
-            () => {
-              try {
-                console.log('About to call runOnJS(onAccept)');
-                runOnJS(onAccept)();
-              } catch (_error) {
-                console.log('Error calling onAccept:', _error);
-              }
-            },
-          );
-        } else {
-          // Simplified reset with error protection
-          translateX.value = withTiming(0, {
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-          });
-        }
-      } catch (error) {
-        console.log('Gesture end error:', error);
-        // Reset to safe state
-        translateX.value = 0;
-      }
-    },
-  });
-
-  const swipeIconStyle = useAnimatedStyle(() => ({
-    transform: [{translateX: translateX.value}],
-  }));
-
-  const swipeTrackStyle = useAnimatedStyle(() => {
-    const progress = translateX.value / ACCEPT_THRESHOLD;
-    return {
-      backgroundColor: progress > 0.5 ? '#4ade80' : PRIMARY_GREEN,
-    };
-  });
-
-  const swipeTextStyle = useAnimatedStyle(() => {
-    const progress = translateX.value / ACCEPT_THRESHOLD;
-    return {
-      opacity: progress > 0.3 ? 0.7 : 1,
-    };
-  });
 
   const onDeny = useCallback(() => {
     if (isAnimating || !orderData) return;
@@ -338,6 +250,9 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     user,
   ]);
 
+
+ 
+
   // Listen for order assignment responses
   useEffect(() => {
     if (!orderData) return;
@@ -348,53 +263,26 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
 
       if (data.type === 'ASSIGNED') {
         // Order was successfully assigned
-        Alert.alert(
-          '✅ Success',
-          `Order ${data.orderId} has been assigned to you!`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                slideDownOrderUI();
-                setTimeout(() => {
-                  if (navigation && orderData) {
-                    // Navigate to PickupNavigation with order data
-                    const pickupLat = orderData.orderInfo.latitude
-                      ? parseFloat(orderData.orderInfo.latitude)
-                      : 17.43869444638263;
-                    const pickupLng = orderData.orderInfo.longitude
-                      ? parseFloat(orderData.orderInfo.longitude)
-                      : 78.39538337328888;
-
-                    navigation.navigate('PickupNavigation', {
-                      pickupLocation: {
-                        latitude: pickupLat,
-                        longitude: pickupLng,
-                        name: 'Store Location',
-                        address: orderData.orderInfo.formattedAddress,
-                        phoneNumber: '+91-9876543210',
-                      },
-                      driverLocation: driverLocation,
-                      orderId: orderData.orderId.toString(),
-                      orderNumber: orderData.orderNumber,
-                    });
-                  }
-                }, 600);
-              },
-            },
-          ],
-        );
+        navigation.navigate('PickupNavigation', {
+          pickupLocation: {
+            latitude: Number(storeDetails?.txLatitude),
+            longitude: Number(storeDetails?.txLongitude),
+            name:storeDetails?.nmStore,
+            address: storeDetails?.txAddress,
+            phoneNumber: storeDetails?.txPhone,
+          },
+          driverLocation: driverLocation,
+          orderId: orderData.orderId.toString(),
+          orderNumber: orderData.orderNumber,
+        });
       } else if (data.type === 'DECLINED') {
-        Alert.alert('ℹ️ Info', `Order ${data.orderId} was declined.`);
+       
         // Navigate back
         setTimeout(() => {
           navigation?.goBack?.();
         }, 1000);
       } else if (data.type === 'ALREADY_ASSIGNED') {
-        Alert.alert(
-          '⚠️ Oops',
-          `Order ${data.orderId} was already assigned to another agent.`,
-        );
+      
         // Navigate back
         setTimeout(() => {
           navigation?.goBack?.();
@@ -406,6 +294,23 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       // Cleanup is handled by the socket service
     };
   }, []);
+
+  const [storeDetails, setStoreDetails] = useState<any>(null);
+  // For fetching store details
+  const getStoreDetailsFn = async ()=>{
+     const res = await getStoreDetails(Number(orderData?.storeId),1);
+     console.log("this is the res for store",res);
+     setStoreDetails(res?.data);
+  }
+
+  useEffect(()=>{
+    getStoreDetailsFn()
+  },[orderData]);
+
+ 
+
+
+  
 
   useEffect(() => {
     // Show order UI when order data is available
@@ -556,29 +461,40 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
               longitude: driverLocation.longitude,
             }}
             title="My Location"
+            pinColor="Red"
+            anchor={{x: 0.5, y: 0.5}}
+            centerOffset={{x: 0, y: 0}}>
+            
+          </Marker>
+
+          <Marker
+            coordinate={{
+              latitude: Number(orderData?.orderInfo?.latitude),
+              longitude: Number(orderData?.orderInfo?.longitude),
+            }}
+            title="Delivery Location"
             pinColor="purple"
             anchor={{x: 0.5, y: 0.5}}
             centerOffset={{x: 0, y: 0}}>
-            <View style={styles.markerContainer}>
-              <Icon name="motorbike" size={32} color="purple" />
-            </View>
+            
           </Marker>
 
+
+
           {/* Store location marker */}
-          {orderData?.orderInfo?.latitude &&
-            orderData?.orderInfo?.longitude && (
+          {storeDetails?.txLatitude &&
+            storeDetails?.txLongitude && (
               <Marker
-                coordinate={{
-                  latitude: parseFloat(orderData.orderInfo.latitude),
-                  longitude: parseFloat(orderData.orderInfo.longitude),
-                }}
+              coordinate={{
+                latitude: parseFloat(storeDetails.txLatitude),
+                longitude: parseFloat(storeDetails.txLongitude),
+              }}
                 title="Store Location"
-                pinColor="red"
+                pinColor="#FF6B6B"
+                zIndex={22}
                 anchor={{x: 0.5, y: 0.5}}
                 centerOffset={{x: 0, y: 0}}>
-                <View style={styles.markerContainer}>
-                  <Icon name="store" size={32} color="red" />
-                </View>
+                
               </Marker>
             )}
         </MapView>
@@ -624,13 +540,13 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
                   <Text style={styles.pickupTagText}>Pick up</Text>
                 </View>
                 <Text style={styles.restaurant}>
-                  {orderData?.orderInfo?.formattedAddress
-                    ? 'Store Location'
-                    : 'Store Location'}
+                  Store Location: {storeDetails?.txAddress
+                   
+                  }
                 </Text>
                 <Text style={styles.address}>
-                  {orderData?.orderInfo?.formattedAddress ||
-                    'Address not available'}
+                  Delivery Location: {orderData?.orderInfo?.formattedAddress 
+                   }
                 </Text>
                 {orderData?.orderInfo?.latitude &&
                   orderData?.orderInfo?.longitude && (
@@ -645,26 +561,13 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
                   )}
               </View>
 
-              <View style={styles.swipeContainer}>
-                <Animated.View style={[styles.swipeTrack, swipeTrackStyle]}>
-                  <Animated.Text style={[styles.acceptText, swipeTextStyle]}>
-                    Accept order
-                  </Animated.Text>
-                  <PanGestureHandler
-                    onGestureEvent={panHandler}
-                    activeOffsetX={[-10, 10]}
-                    activeOffsetY={[-5, 5]}
-                    shouldCancelWhenOutside={false}>
-                    <Animated.View style={[styles.swipeThumb, swipeIconStyle]}>
-                      <Icon
-                        name="arrow-right"
-                        size={22}
-                        color={PRIMARY_GREEN}
-                      />
-                    </Animated.View>
-                  </PanGestureHandler>
-                </Animated.View>
-              </View>
+              <TouchableOpacity
+                style={styles.acceptButton}
+                onPress={onAccept}
+                activeOpacity={0.8}>
+                <Text style={styles.acceptButtonText}>Accept order</Text>
+                <Icon name="arrow-right" size={22} color="white" />
+              </TouchableOpacity>
             </View>
           </RNAnimated.View>
         )}
@@ -696,7 +599,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: height * 0.45,
+    height: height * 0.48,
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -762,29 +665,25 @@ const styles = StyleSheet.create({
   address: {marginTop: 4, color: '#4B5563'},
   row: {flexDirection: 'row', alignItems: 'center', marginTop: 8},
   away: {color: '#6B7280'},
-  swipeContainer: {marginTop: 18},
-  swipeTrack: {
+  acceptButton: {
+    marginTop: 18,
     height: 56,
     backgroundColor: PRIMARY_GREEN,
     borderRadius: 28,
-    overflow: 'hidden',
+    flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 4,
   },
-  acceptText: {
-    textAlign: 'center',
+  acceptButtonText: {
     color: 'white',
     fontFamily: Fonts.SemiBold,
     fontSize: 16,
-  },
-  swipeThumb: {
-    position: 'absolute',
-    left: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   markerContainer: {
     alignItems: 'center',
