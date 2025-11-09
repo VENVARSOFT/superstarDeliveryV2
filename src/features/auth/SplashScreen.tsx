@@ -20,6 +20,7 @@ GeoLocation.setRNConfiguration({
 
 const SplashScreen: FC = () => {
   const {user, setUser} = useAuthStore();
+  console.log('user', user);
 
   const tokenCheck = async () => {
     try {
@@ -27,12 +28,14 @@ const SplashScreen: FC = () => {
       if (tokenManager.isAuthenticated()) {
         // Get valid access token (will refresh if needed)
         const validToken = await tokenManager.getValidAccessToken();
-
+       
         if (validToken) {
           // If user data exists in Redux, navigate to appropriate dashboard based on user type
-          if (user && (user as any).nmUserType) {
-            const userType = (user as any).nmUserType;
-            if (userType === 'DELIVERY_MOBILE') {
+          if (user ) {
+            Alert.alert('user', user);
+            const userType = (user as any);
+            Alert.alert('userType', userType);
+            if (userType) {
               resetAndNavigate('DeliveryDashboard');
             } else {
               resetAndNavigate('CustomerLogin');
@@ -45,9 +48,9 @@ const SplashScreen: FC = () => {
               // Wait a bit for Redux state to update
               await new Promise(resolve => setTimeout(resolve, 100));
               // Check user again after refetch
-              if (user && (user as any).nmUserType) {
-                const userType = (user as any).nmUserType;
-                if (userType === 'DELIVERY_MOBILE') {
+              if (user ) {
+                const userType = (user as any);
+                if (userType) {
                   resetAndNavigate('DeliveryDashboard');
                 } else {
                   resetAndNavigate('CustomerLogin');

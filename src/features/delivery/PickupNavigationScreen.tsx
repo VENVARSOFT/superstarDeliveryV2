@@ -125,6 +125,9 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     );
   }, [route?.params?.pickupLocation]);
 
+
+  console.log("this is the pickup location",pickupLocation);
+
   // Get orderId from route params
   const orderId = useMemo(() => {
     return route?.params?.orderId || null;
@@ -231,7 +234,12 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
 
   // Send location update to socket
   const sendLocationUpdate = useCallback(
-    (location: DriverLocation, position: any) => {
+    (
+      location: DriverLocation,
+      position: any,
+      orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' = 'IN_TRANSIT',
+      forceSend: boolean = false,
+    ) => {
       // Check connection status dynamically instead of relying on state
       const isConnected = socketService.getConnectionStatus();
 
@@ -252,12 +260,16 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       }
 
       const now = Date.now();
-      // Send location update every 5 seconds
-      if (now - lastSocketLocationUpdate.current < 5000) {
+      // Send location update every 5 seconds (unless forced)
+      if (!forceSend && now - lastSocketLocationUpdate.current < 5000) {
         return;
       }
 
-      const {latitude, longitude, accuracy, speed} = position.coords;
+      // Extract coordinates from position or use location directly
+      const latitude = position?.coords?.latitude ?? location.latitude;
+      const longitude = position?.coords?.longitude ?? location.longitude;
+      const accuracy = position?.coords?.accuracy ?? 0;
+      const speed = position?.coords?.speed ?? 0;
 
       const locationData = {
         orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
@@ -265,23 +277,19 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
         latitude: latitude,
         longitude: longitude,
         timestamp: now,
-        orderStatus: 'ASSIGNED',
+        orderStatus: orderStatus,
         accuracy: accuracy || 0,
         speed: speed || 0,
       };
 
-      console.log('📤 Attempting to emit location_update:', locationData);
+      console.log(`📤 Attempting to emit location_update with status ${orderStatus}:`, locationData);
 
       try {
         const success = socketService.emit('location_update', locationData);
 
         if (success) {
           lastSocketLocationUpdate.current = now;
-          socketService.on('location_update', (data)=>{
-            console.log('KK_6------------------------->', data)
-            
-          });
-          Alert.alert('Location update sent to socket successfully');
+          console.log(`✅ Location update sent successfully with status: ${orderStatus}`);
         } else {
           console.warn(
             '⚠️ Failed to send location update to socket - emit returned false',
@@ -293,6 +301,8 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     },
     [orderId, user?.idUser, socketService],
   );
+
+
 
   // Start location tracking with optimized debouncing
   const startLocationTracking = useCallback(() => {
@@ -311,8 +321,8 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
         const {latitude, longitude} = position.coords;
         const newLocation = {latitude, longitude};
 
-        // Always send location update to socket every 5 seconds (regardless of distance change)
-        sendLocationUpdate(newLocation, position);
+        // Always send location update to socket every 5 seconds with IN_TRANSIT status
+        sendLocationUpdate(newLocation, position, 'IN_TRANSIT');
 
         // Debounce UI location updates (minimum 5 seconds between updates)
         if (now - lastLocationUpdate.current < 5000) {
@@ -541,6 +551,32 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     console.log('Route params:', route?.params);
     console.log('Pickup location:', pickupLocation);
 
+    // Get current location to send with REACHED status
+    try {
+      const currentLocation = await getCurrentLocation();
+      
+      // Send location update with REACHED status immediately (force send)
+      sendLocationUpdate(
+        currentLocation,
+        {coords: {latitude: currentLocation.latitude, longitude: currentLocation.longitude}},
+        'REACHED',
+        true, // forceSend = true to bypass 5 second throttle
+      );
+      
+      console.log('✅ REACHED status sent with current coordinates');
+    } catch (error) {
+      console.error('❌ Error getting current location for REACHED status:', error);
+      // Fallback to driverLocation if available
+      if (driverLocation) {
+        sendLocationUpdate(
+          driverLocation,
+          {coords: {latitude: driverLocation.latitude, longitude: driverLocation.longitude}},
+          'REACHED',
+          true,
+        );
+      }
+    }
+
     // Enhanced success haptic feedback
     triggerHaptic('success');
     Vibration.vibrate([0, 50, 100, 50, 100]);
@@ -585,7 +621,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       console.error('Navigation object is null or undefined');
       Alert.alert('Navigation Error', 'Unable to navigate to order details');
     }
-  }, [navigation, route?.params, pickupLocation, triggerHaptic]);
+  }, [navigation, route?.params, pickupLocation, triggerHaptic, sendLocationUpdate, getCurrentLocation, driverLocation]);
 
   // Animated styles for swipe button
   const swipeButtonStyle = useAnimatedStyle(() => {
@@ -809,14 +845,14 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
           )}
 
           {/* Pickup location marker */}
-          <Marker
+         {pickupLocation && <Marker
             coordinate={pickupLocation}
             title={pickupLocation.name}
             description={pickupLocation.address}>
             <View style={styles.pickupMarker}>
               <Icon name="silverware-fork-knife" size={24} color="white" />
             </View>
-          </Marker>
+          </Marker>}
 
           {/* Route polyline */}
           {routePoints.length > 1 && (

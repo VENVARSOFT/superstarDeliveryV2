@@ -157,6 +157,8 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       message: 'I will deliver this order',
     });
 
+    Alert.alert("this is the success",success.toString());
+
     if (!success) {
       Alert.alert(
         'Error',
@@ -251,6 +253,17 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   ]);
 
 
+  const [storeDetails, setStoreDetails] = useState<any>(null);
+  // For fetching store details
+  const getStoreDetailsFn = async ()=>{
+     const res = await getStoreDetails(Number(orderData?.storeId),1);
+     console.log("this is the store details",res.data);
+     setStoreDetails(res?.data);
+  }
+
+  useEffect(()=>{
+    getStoreDetailsFn()
+  },[orderData]);
  
 
   // Listen for order assignment responses
@@ -263,29 +276,33 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
 
       if (data.type === 'ASSIGNED') {
         // Order was successfully assigned
-        navigation.navigate('PickupNavigation', {
-          pickupLocation: {
-            latitude: Number(storeDetails?.txLatitude),
-            longitude: Number(storeDetails?.txLongitude),
-            name:storeDetails?.nmStore,
-            address: storeDetails?.txAddress,
-            phoneNumber: storeDetails?.txPhone,
-          },
-          driverLocation: driverLocation,
-          orderId: orderData.orderId.toString(),
-          orderNumber: orderData.orderNumber,
-        });
+        console.log("this is the store details2",storeDetails);
+        if(storeDetails){
+          console.log("this is the store details3",storeDetails);
+          navigation.navigate('PickupNavigation', {
+            pickupLocation: {
+              latitude: Number(storeDetails?.txLatitude),
+              longitude: Number(storeDetails?.txLongitude),
+              name:storeDetails?.nmStore,
+              address: storeDetails?.txAddress,
+              phoneNumber: storeDetails?.txPhone,
+            },
+            driverLocation: driverLocation,
+            orderId: orderData.orderId.toString(),
+            orderNumber: orderData.orderNumber,
+          });
+        }
       } else if (data.type === 'DECLINED') {
        
         // Navigate back
         setTimeout(() => {
-          navigation?.goBack?.();
+          navigation?.pop();
         }, 1000);
       } else if (data.type === 'ALREADY_ASSIGNED') {
       
         // Navigate back
         setTimeout(() => {
-          navigation?.goBack?.();
+          navigation?.pop();
         }, 1000);
       }
     });
@@ -293,19 +310,8 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     return () => {
       // Cleanup is handled by the socket service
     };
-  }, []);
+  }, [storeDetails]);
 
-  const [storeDetails, setStoreDetails] = useState<any>(null);
-  // For fetching store details
-  const getStoreDetailsFn = async ()=>{
-     const res = await getStoreDetails(Number(orderData?.storeId),1);
-     console.log("this is the res for store",res);
-     setStoreDetails(res?.data);
-  }
-
-  useEffect(()=>{
-    getStoreDetailsFn()
-  },[orderData]);
 
  
 
@@ -599,7 +605,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: height * 0.48,
+    height: height * 0.45,
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

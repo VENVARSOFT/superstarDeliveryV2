@@ -37,6 +37,7 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
   const [_location, setLocation] = useState<LocationState | null>(null);
   const [isFocused, _setIsFocused] = useState(false);
   const [todaysEarnings, _setTodaysEarnings] = useState(0.0);
+  const [isToggling, setIsToggling] = useState(false);
 
   // Animation values
   const toggleAnim = useSharedValue(0);
@@ -50,8 +51,17 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
   }, [onDuty, toggleAnim]);
 
   const toggleOnDuty = useCallback(async () => {
-    if (!onDuty) {
-      // Request location permission
+    // Prevent multiple simultaneous toggles
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    const newOnDutyState = !onDuty;
+    
+    // Optimistically update state immediately for smooth UI response
+    setOnDuty(newOnDutyState);
+
+    if (newOnDutyState) {
+      // Going ON-DUTY: Request location permission
       Geolocation.requestAuthorization();
 
       // Get current position
@@ -74,9 +84,13 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
             heading: heading as number,
           });
 
-          setOnDuty(!onDuty);
+          setIsToggling(false);
         },
         error => {
+          // Revert state on error
+          setOnDuty(false);
+          setIsToggling(false);
+          
           if (error.code === 1) {
             // Permission denied
             Alert.alert(
@@ -97,11 +111,11 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
         },
       );
     } else {
-      // Emit 'goOffDuty' event
+      // Going OFF-DUTY: Emit 'goOffDuty' event
       emit('goOffDuty', {});
-      setOnDuty(false);
+      setIsToggling(false);
     }
-  }, [onDuty, emit, setOnDuty]);
+  }, [onDuty, emit, setOnDuty, isToggling]);
 
   // Animated styles
   const animatedToggleStyle = useAnimatedStyle(() => {
@@ -139,12 +153,6 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
     };
   });
 
-  useEffect(() => {
-    if (isFocused) {
-      toggleOnDuty();
-    }
-  }, [isFocused, toggleOnDuty]);
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFEB3B" />
@@ -160,6 +168,7 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
           <TouchableOpacity
             onPress={toggleOnDuty}
             activeOpacity={0.8}
+            disabled={isToggling}
             style={styles.toggleContainer}>
             <Animated.View style={[styles.toggleSwitch, animatedToggleStyle]}>
               <Animated.View style={[styles.toggleThumb, animatedThumbStyle]} />
