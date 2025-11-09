@@ -42,6 +42,9 @@ import {
   calculateRoute as calculateRouteService,
   openExternalNavigation,
 } from '@service/directionsService';
+import {useWS} from '@service/WsProvider';
+import {useAuthStore} from '@state/authStore';
+import {USER_TYPES} from '@service/config';
 
 // Types
 interface PickupLocation {
@@ -81,6 +84,10 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
   navigation,
   route,
 }) => {
+  // Socket and Auth
+  const socketService = useWS();
+  const {user} = useAuthStore();
+
   // State
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
     null,
@@ -98,6 +105,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
   const locationWatchId = useRef<number | null>(null);
   const lastLocationUpdate = useRef<number>(0);
   const lastRouteUpdate = useRef<number>(0);
+  const lastSocketLocationUpdate = useRef<number>(0);
   const isInitialized = useRef<boolean>(false);
 
   // Animated values for swipe-to-confirm
@@ -116,6 +124,11 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       }
     );
   }, [route?.params?.pickupLocation]);
+
+  // Get orderId from route params
+  const orderId = useMemo(() => {
+    return route?.params?.orderId || null;
+  }, [route?.params?.orderId]);
 
   // Initial driver location
   const initialDriverLocation = useMemo(() => {
@@ -216,11 +229,77 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     [],
   );
 
+  // Send location update to socket
+  const sendLocationUpdate = useCallback(
+    (location: DriverLocation, position: any) => {
+      // Check connection status dynamically instead of relying on state
+      const isConnected = socketService.getConnectionStatus();
+
+      // Debug logging
+      if (!isConnected) {
+        console.log('⚠️ Socket not connected, skipping location update');
+        return;
+      }
+
+      if (!orderId) {
+        console.log('⚠️ OrderId not available, skipping location update');
+        return;
+      }
+
+      if (!user?.idUser) {
+        console.log('⚠️ User ID not available, skipping location update');
+        return;
+      }
+
+      const now = Date.now();
+      // Send location update every 5 seconds
+      if (now - lastSocketLocationUpdate.current < 5000) {
+        return;
+      }
+
+      const {latitude, longitude, accuracy, speed} = position.coords;
+
+      const locationData = {
+        orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
+        deliveryAgentId: user.idUser as number,
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: now,
+        orderStatus: 'ASSIGNED',
+        accuracy: accuracy || 0,
+        speed: speed || 0,
+      };
+
+      console.log('📤 Attempting to emit location_update:', locationData);
+
+      try {
+        const success = socketService.emit('location_update', locationData);
+
+        if (success) {
+          lastSocketLocationUpdate.current = now;
+          Alert.alert('Location update sent to socket successfully');
+        } else {
+          console.warn(
+            '⚠️ Failed to send location update to socket - emit returned false',
+          );
+        }
+      } catch (err) {
+        console.error('❌ Error sending location update:', err);
+      }
+    },
+    [orderId, user?.idUser, socketService],
+  );
+
   // Start location tracking with optimized debouncing
   const startLocationTracking = useCallback(() => {
     if (locationWatchId.current) {
       Geolocation.clearWatch(locationWatchId.current);
     }
+
+    console.log('📍 Starting location tracking...');
+    console.log('📍 Socket connected:', socketService.getConnectionStatus());
+    console.log('📍 OrderId:', orderId);
+    console.log('📍 User ID:', user?.idUser);
 
     locationWatchId.current = Geolocation.watchPosition(
       position => {
@@ -228,12 +307,15 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
         const {latitude, longitude} = position.coords;
         const newLocation = {latitude, longitude};
 
-        // Debounce location updates (minimum 5 seconds between updates)
+        // Always send location update to socket every 5 seconds (regardless of distance change)
+        sendLocationUpdate(newLocation, position);
+
+        // Debounce UI location updates (minimum 5 seconds between updates)
         if (now - lastLocationUpdate.current < 5000) {
           return;
         }
 
-        // Only update if location changed significantly (more than 100m)
+        // Only update UI if location changed significantly (more than 100m)
         if (driverLocation) {
           const locationDistance = calculateDistance(newLocation, {
             latitude: driverLocation.latitude,
@@ -242,7 +324,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
             address: '',
           });
           if (locationDistance < 0.1) {
-            // Less than 100m
+            // Less than 100m - skip UI update but socket update already sent
             return;
           }
         }
@@ -264,14 +346,14 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
           }
         }
       },
-      error => {
-        console.error('Location tracking error:', error);
+      err => {
+        console.error('Location tracking error:', err);
         setError('Location tracking failed');
       },
       {
         enableHighAccuracy: true,
-        distanceFilter: 100, // Update every 100 meters
-        interval: 15000, // Update every 15 seconds
+        distanceFilter: 10, // Update every 10 meters (more frequent for socket updates)
+        interval: 5000, // Update every 5 seconds for socket updates
       },
     );
   }, [
@@ -280,6 +362,10 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     pickupLocation,
     calculateRoute,
     calculateDistance,
+    sendLocationUpdate,
+    socketService,
+    orderId,
+    user?.idUser,
   ]);
 
   // Initialize location and route
@@ -526,6 +612,50 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       backgroundColor: backgroundColor < 0.5 ? PRIMARY_GREEN : '#4ade80',
     };
   });
+
+  // Initialize socket connection and monitor connection status
+  useEffect(() => {
+    // Monitor socket connection status
+    const unsubscribe = socketService.onConnectionChange(connected => {
+      console.log(
+        'Socket connection status:',
+        connected ? '🟢 Connected' : '🔴 Disconnected',
+      );
+
+      // If socket just connected and location tracking is initialized, log it
+      if (connected && isInitialized.current) {
+        console.log('✅ Socket connected - location updates will now be sent');
+      }
+    });
+
+    // Connect socket if not already connected
+    const connectSocket = async () => {
+      if (
+        !socketService.getConnectionStatus() &&
+        user?.idUser &&
+        user?.fkStoreId
+      ) {
+        try {
+          await socketService.connect(undefined, {
+            userId: user.idUser as number,
+            userType: USER_TYPES.DELIVERY_PARTNER,
+            storeId: user.fkStoreId as number,
+          });
+          console.log('✅ Socket connected for location tracking');
+        } catch (error) {
+          console.error('❌ Failed to connect socket:', error);
+        }
+      } else if (socketService.getConnectionStatus()) {
+        console.log('✅ Socket already connected');
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.idUser, user?.fkStoreId, socketService]);
 
   // Initialize on mount
   useEffect(() => {

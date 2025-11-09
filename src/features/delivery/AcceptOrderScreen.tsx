@@ -342,7 +342,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   useEffect(() => {
     if (!orderData) return;
 
-    const unsubscribe = socketService.onOrderAssignmentResponse(data => {
+    socketService.onOrderAssignmentResponse(data => {
       console.log('📥 Order assignment response received:', data);
       setOrderResponse(data);
 
@@ -405,7 +405,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     return () => {
       // Cleanup is handled by the socket service
     };
-  }, [orderData, socketService, navigation, driverLocation, slideDownOrderUI]);
+  }, []);
 
   useEffect(() => {
     // Show order UI when order data is available
