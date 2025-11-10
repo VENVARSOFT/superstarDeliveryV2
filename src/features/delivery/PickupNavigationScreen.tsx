@@ -125,8 +125,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     );
   }, [route?.params?.pickupLocation]);
 
-
-  console.log("this is the pickup location",pickupLocation);
+  console.log('this is the pickup location', pickupLocation);
 
   // Get orderId from route params
   const orderId = useMemo(() => {
@@ -232,77 +231,80 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     [],
   );
 
-    // Send location update to socket
-    const sendLocationUpdate = useCallback(
-      (
-        location: DriverLocation,
-        position: any,
-        orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' = 'IN_TRANSIT',
-        forceSend: boolean = false,
-      ) => {
-        // Check connection status dynamically instead of relying on state
-        const isConnected = socketService.getConnectionStatus();
+  // Send location update to socket
+  const sendLocationUpdate = useCallback(
+    (
+      location: DriverLocation,
+      position: any,
+      orderStatus: 'ASSIGNED' | 'IN_TRANSIT' | 'REACHED' = 'IN_TRANSIT',
+      forceSend: boolean = false,
+    ) => {
+      // Check connection status dynamically instead of relying on state
+      const isConnected = socketService.getConnectionStatus();
 
-        // Debug logging
-        if (!isConnected) {
-          console.log('⚠️ Socket not connected, skipping location update');
-          return;
+      // Debug logging
+      if (!isConnected) {
+        console.log('⚠️ Socket not connected, skipping location update');
+        return;
+      }
+
+      if (!orderId) {
+        console.log('⚠️ OrderId not available, skipping location update');
+        return;
+      }
+
+      if (!user?.idUser) {
+        console.log('⚠️ User ID not available, skipping location update');
+        return;
+      }
+
+      const now = Date.now();
+      // Send location update every 5 seconds (unless forced)
+      if (!forceSend && now - lastSocketLocationUpdate.current < 5000) {
+        return;
+      }
+
+      // Extract coordinates from position or use location directly
+      const latitude = position?.coords?.latitude ?? location.latitude;
+      const longitude = position?.coords?.longitude ?? location.longitude;
+      const accuracy = position?.coords?.accuracy ?? 0;
+      const speed = position?.coords?.speed ?? 0;
+
+      const locationData = {
+        orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
+        deliveryAgentId: user.idUser as number,
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: now,
+        orderStatus: orderStatus,
+        accuracy: accuracy || 0,
+        speed: speed || 0,
+      };
+
+      console.log(
+        `📤 Attempting to emit location_update with status ${orderStatus}:`,
+        locationData,
+      );
+
+      try {
+        const success = socketService.emit('location_update', locationData);
+
+        if (success) {
+          lastSocketLocationUpdate.current = now;
+          console.log(
+            `✅ Location update sent successfully with status: ${orderStatus}`,
+          );
+        } else {
+          console.warn(
+            '⚠️ Failed to send location update to socket - emit returned false',
+          );
         }
-
-        if (!orderId) {
-          console.log('⚠️ OrderId not available, skipping location update');
-          return;
-        }
-
-        if (!user?.idUser) {
-          console.log('⚠️ User ID not available, skipping location update');
-          return;
-        }
-
-        const now = Date.now();
-        // Send location update every 5 seconds (unless forced)
-        if (!forceSend && now - lastSocketLocationUpdate.current < 5000) {
-          return;
-        }
-
-        // Extract coordinates from position or use location directly
-        const latitude = position?.coords?.latitude ?? location.latitude;
-        const longitude = position?.coords?.longitude ?? location.longitude;
-        const accuracy = position?.coords?.accuracy ?? 0;
-        const speed = position?.coords?.speed ?? 0;
-
-        const locationData = {
-          orderId: typeof orderId === 'string' ? parseInt(orderId, 10) : orderId,
-          deliveryAgentId: user.idUser as number,
-          latitude: latitude,
-          longitude: longitude,
-          timestamp: now,
-          orderStatus: orderStatus,
-          accuracy: accuracy || 0,
-          speed: speed || 0,
-        };
-
-        console.log(`📤 Attempting to emit location_update with status ${orderStatus}:`, locationData);
-
-        try {
-          const success = socketService.emit('location_update', locationData);
-
-          if (success) {
-            lastSocketLocationUpdate.current = now;
-            console.log(`✅ Location update sent successfully with status: ${orderStatus}`);
-          } else {
-            console.warn(
-              '⚠️ Failed to send location update to socket - emit returned false',
-            );
-          }
-        } catch (err) {
-          console.error('❌ Error sending location update:', err);
-        }
-      },
-      [orderId, user?.idUser, socketService],
-    );
-
-
+      } catch (err) {
+        console.error('❌ Error sending location update:', err);
+      }
+    },
+    [orderId, user?.idUser, socketService],
+  );
 
   // Start location tracking with optimized debouncing
   const startLocationTracking = useCallback(() => {
@@ -554,23 +556,36 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
     // Get current location to send with REACHED status
     try {
       const currentLocation = await getCurrentLocation();
-      
+
       // Send location update with REACHED status immediately (force send)
       sendLocationUpdate(
         currentLocation,
-        {coords: {latitude: currentLocation.latitude, longitude: currentLocation.longitude}},
+        {
+          coords: {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+          },
+        },
         'REACHED',
         true, // forceSend = true to bypass 5 second throttle
       );
-      
+
       console.log('✅ REACHED status sent with current coordinates');
     } catch (error) {
-      console.error('❌ Error getting current location for REACHED status:', error);
+      console.error(
+        '❌ Error getting current location for REACHED status:',
+        error,
+      );
       // Fallback to driverLocation if available
       if (driverLocation) {
         sendLocationUpdate(
           driverLocation,
-          {coords: {latitude: driverLocation.latitude, longitude: driverLocation.longitude}},
+          {
+            coords: {
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+            },
+          },
           'REACHED',
           true,
         );
@@ -621,7 +636,15 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
       console.error('Navigation object is null or undefined');
       Alert.alert('Navigation Error', 'Unable to navigate to order details');
     }
-  }, [navigation, route?.params, pickupLocation, triggerHaptic, sendLocationUpdate, getCurrentLocation, driverLocation]);
+  }, [
+    navigation,
+    route?.params,
+    pickupLocation,
+    triggerHaptic,
+    sendLocationUpdate,
+    getCurrentLocation,
+    driverLocation,
+  ]);
 
   // Animated styles for swipe button
   const swipeButtonStyle = useAnimatedStyle(() => {
@@ -817,7 +840,7 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
           showsCompass={false}
           showsScale={false}
           showsBuildings={true}
-          showsTraffic={true}
+          showsTraffic={false}
           showsIndoors={false}
           mapType="standard"
           onRegionChangeComplete={_region => {
@@ -845,14 +868,16 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
           )}
 
           {/* Pickup location marker */}
-         {pickupLocation && <Marker
-            coordinate={pickupLocation}
-            title={pickupLocation.name}
-            description={pickupLocation.address}>
-            <View style={styles.pickupMarker}>
-              <Icon name="silverware-fork-knife" size={24} color="white" />
-            </View>
-          </Marker>}
+          {pickupLocation && (
+            <Marker
+              coordinate={pickupLocation}
+              title={pickupLocation.name}
+              description={pickupLocation.address}>
+              <View style={styles.pickupMarker}>
+                <Icon name="silverware-fork-knife" size={24} color="white" />
+              </View>
+            </Marker>
+          )}
 
           {/* Route polyline */}
           {routePoints.length > 1 && (

@@ -28,15 +28,15 @@ const SplashScreen: FC = () => {
       if (tokenManager.isAuthenticated()) {
         // Get valid access token (will refresh if needed)
         const validToken = await tokenManager.getValidAccessToken();
-       
+
         if (validToken) {
           // If user data exists in Redux, navigate to appropriate dashboard based on user type
-          if (user ) {
+          if (user) {
             Alert.alert('user', user);
-            const userType = (user as any);
+            const userType = user as any;
             Alert.alert('userType', userType);
             if (userType) {
-              resetAndNavigate('DeliveryDashboard');
+              resetAndNavigate('Home');
             } else {
               resetAndNavigate('CustomerLogin');
             }
@@ -48,10 +48,10 @@ const SplashScreen: FC = () => {
               // Wait a bit for Redux state to update
               await new Promise(resolve => setTimeout(resolve, 100));
               // Check user again after refetch
-              if (user ) {
-                const userType = (user as any);
+              if (user) {
+                const userType = user as any;
                 if (userType) {
-                  resetAndNavigate('DeliveryDashboard');
+                  resetAndNavigate('Home');
                 } else {
                   resetAndNavigate('CustomerLogin');
                 }
