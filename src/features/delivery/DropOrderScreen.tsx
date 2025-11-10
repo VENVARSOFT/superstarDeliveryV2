@@ -71,7 +71,7 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
           text: 'OK',
           onPress: () => {
             // Navigate back to dashboard or next order
-            navigation?.navigate('DeliveryDashboard');
+            navigation?.navigate('Home');
           },
         },
       ],
