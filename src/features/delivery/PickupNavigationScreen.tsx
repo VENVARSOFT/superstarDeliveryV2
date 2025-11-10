@@ -44,7 +44,8 @@ import {
 } from '@service/directionsService';
 import {useWS} from '@service/WsProvider';
 import {useAuthStore} from '@state/authStore';
-import {USER_TYPES} from '@service/config';
+import {GOOGLE_MAP_API, USER_TYPES} from '@service/config';
+import MapViewDirections from 'react-native-maps-directions';
 
 // Types
 interface PickupLocation {
@@ -880,14 +881,24 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
           )}
 
           {/* Route polyline */}
-          {routePoints.length > 1 && (
+          {/* {routePoints.length > 1 && (
             <Polyline
               coordinates={routePoints}
               strokeColor={PRIMARY_GREEN}
               strokeWidth={4}
               lineDashPattern={[8, 6]}
             />
-          )}
+          )} */}
+          {driverLocation != undefined && pickupLocation != undefined ? (
+          <MapViewDirections
+            origin={driverLocation}
+            destination={pickupLocation}
+            apikey={GOOGLE_MAP_API}
+            strokeColor={PRIMARY_GREEN}
+            mode='DRIVING'
+            strokeWidth={4}
+          />
+        ) : null}
         </MapView>
 
         {/* Map controls */}

@@ -21,6 +21,8 @@ import {useWS, OrderAssignmentRequest} from '@service/WsProvider';
 import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
 import { getStoreDetails } from '@service/orderService';
+import { GOOGLE_MAP_API } from '@service/config';
+import MapViewDirections from 'react-native-maps-directions';
 
 Geolocation.setRNConfiguration?.({
   skipPermissionRequests: false,
@@ -461,18 +463,23 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           showsScale={false}
           showsIndoorLevelPicker={false}>
           {/* Marker for current driver location */}
-          <Marker
-            coordinate={{
-              latitude: driverLocation.latitude,
-              longitude: driverLocation.longitude,
-            }}
-            title="My Location"
-            pinColor="Red"
-            anchor={{x: 0.5, y: 0.5}}
-            centerOffset={{x: 0, y: 0}}>
-            
-          </Marker>
 
+          {driverLocation && 
+          <Marker
+          coordinate={{
+            latitude: driverLocation.latitude,
+            longitude: driverLocation.longitude,
+          }}
+          title="My Location"
+          pinColor="Red"
+          anchor={{x: 0.5, y: 0.5}}
+          centerOffset={{x: 0, y: 0}}>
+          
+        </Marker>
+          }
+          
+
+{orderData?.orderInfo?.latitude && orderData?.orderInfo?.longitude && (
           <Marker
             coordinate={{
               latitude: Number(orderData?.orderInfo?.latitude),
@@ -484,6 +491,27 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
             centerOffset={{x: 0, y: 0}}>
             
           </Marker>
+)}
+
+
+{/* For showing the destination marker */}
+{driverLocation != undefined && orderData?.orderInfo?.latitude && orderData?.orderInfo?.longitude != undefined ? (
+          <MapViewDirections
+            origin={{
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+            }}
+            destination={{
+              latitude: Number(orderData?.orderInfo?.latitude),
+              longitude: Number(orderData?.orderInfo?.longitude),
+            }}
+            apikey={GOOGLE_MAP_API}
+            strokeColor={PRIMARY_GREEN}
+            mode='DRIVING'
+            strokeWidth={4}
+          />
+        ) : null} 
+
 
 
 
@@ -605,7 +633,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: height * 0.45,
+    height: height * 0.48,
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
