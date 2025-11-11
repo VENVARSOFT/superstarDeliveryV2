@@ -1,6 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  Alert,
   Animated,
   Image,
   Keyboard,
@@ -57,12 +56,10 @@ const Otp = () => {
 
   const handleVerify = async () => {
     if (otp.length !== 6) {
-      Alert.alert('Invalid OTP', 'Please enter a valid 6-digit code.');
       return;
     }
 
     if (!phone) {
-      Alert.alert('Error', 'Phone number not found. Please try again.');
       return;
     }
 
@@ -86,11 +83,6 @@ const Otp = () => {
       }
     } catch (error: any) {
       console.error('OTP Verification Error:', error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.message ||
-        'OTP verification failed. Please try again.';
-      Alert.alert('Verification Failed', errorMessage);
     } finally {
       setLoading(false);
     }

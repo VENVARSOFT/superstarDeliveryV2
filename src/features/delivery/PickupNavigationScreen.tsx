@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
-  Alert,
   Linking,
   ActivityIndicator,
   Vibration,
@@ -429,8 +428,6 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
   const handleCall = useCallback(() => {
     if (pickupLocation.phoneNumber) {
       Linking.openURL(`tel:${pickupLocation.phoneNumber}`);
-    } else {
-      Alert.alert('No phone number available');
     }
   }, [pickupLocation.phoneNumber]);
 
@@ -626,16 +623,9 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
         console.log('Navigation call completed');
       } catch (navError) {
         console.error('Navigation error:', navError);
-        Alert.alert(
-          'Navigation Error',
-          `Failed to navigate: ${
-            navError instanceof Error ? navError.message : 'Unknown error'
-          }`,
-        );
       }
     } else {
       console.error('Navigation object is null or undefined');
-      Alert.alert('Navigation Error', 'Unable to navigate to order details');
     }
   }, [
     navigation,
@@ -750,25 +740,12 @@ const PickupNavigationScreen: React.FC<PickupNavigationScreenProps> = ({
 
   // Handle emergency button
   const handleEmergency = useCallback(() => {
-    Alert.alert('Emergency', 'Call emergency services?', [
-      {text: 'Cancel', style: 'cancel'},
-      {
-        text: 'Call',
-        onPress: () => Linking.openURL('tel:100'),
-        style: 'destructive',
-      },
-    ]);
+    Linking.openURL('tel:100');
   }, []);
 
   // Handle support button
   const handleSupport = useCallback(() => {
-    Alert.alert('Support', 'Contact support team?', [
-      {text: 'Cancel', style: 'cancel'},
-      {
-        text: 'Call Support',
-        onPress: () => Linking.openURL('tel:+91-1800-123-456'),
-      },
-    ]);
+    Linking.openURL('tel:+91-1800-123-456');
   }, []);
 
   // Handle profile button

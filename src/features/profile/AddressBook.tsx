@@ -6,7 +6,6 @@ import {
   FlatList,
   SafeAreaView,
   StatusBar,
-  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {RFValue} from 'react-native-responsive-fontsize';
@@ -130,15 +129,10 @@ const AddressBook: FC = () => {
 
   const handleImportFromBlinkit = () => {
     // TODO: Implement Blinkit import functionality
-    Alert.alert(
-      'Coming Soon',
-      'Import from Blinkit feature will be available soon!',
-    );
   };
 
   const handleEditAddress = (address: AddressResponse) => {
     // TODO: Navigate to edit address screen
-    Alert.alert('Edit Address', `Edit ${address.txAddressType} address`);
   };
 
   // const handleDeleteAddress = (address: AddressResponse) => {

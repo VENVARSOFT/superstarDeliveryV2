@@ -1,4 +1,4 @@
-import React, {useCallback, useState, useEffect, useMemo} from 'react';
+import React, {useCallback, useState, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,16 @@ import {
   StatusBar,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
+import MapView, {
+  Circle,
+  Marker,
+  PROVIDER_GOOGLE,
+  Region,
+} from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import {Fonts} from '@utils/Constants';
@@ -18,7 +25,11 @@ import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
 import {getOrderDetails, OrderDetailsResponse} from '@service/orderService';
 import {useWS} from '@service/WsProvider';
-import {USER_TYPES} from '@service/config';
+import {USER_TYPES, GOOGLE_MAP_API} from '@service/config';
+import {
+  calculateRoute as calculateRouteService,
+  openExternalNavigation,
+} from '@service/directionsService';
 
 type Props = {
   route?: any;
@@ -29,12 +40,44 @@ const {width, height} = Dimensions.get('window');
 const PRIMARY_GREEN = '#00A86B';
 const BLUE_COLOR = '#2563eb';
 
+interface DriverLocation {
+  latitude: number;
+  longitude: number;
+}
+
+interface DeliveryLocation {
+  latitude: number;
+  longitude: number;
+  name: string;
+  address: string;
+}
+
+interface StoreLocation {
+  latitude: number;
+  longitude: number;
+  name: string;
+  address: string;
+}
+
 const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [orderData, setOrderData] = useState<
     OrderDetailsResponse['data'] | null
   >(null);
+  const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
+    null,
+  );
+  const [isLocationLoading, setIsLocationLoading] = useState(true);
+  const [eta, setEta] = useState<string>('');
+  const [distance, setDistance] = useState<string>('');
+
+  // Refs
+  const mapRef = useRef<MapView>(null);
+  const locationWatchId = useRef<number | null>(null);
+  const lastLocationUpdate = useRef<number>(0);
+  const lastRouteUpdate = useRef<number>(0);
+  const isInitialized = useRef<boolean>(false);
 
   // Get user from Redux
   const user = useSelector((state: RootState) => state.auth.user);
@@ -126,7 +169,29 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
     socketService,
   ]);
 
-  // Transform API data to UI format
+  // Get store location from orderData
+  const storeLocation = useMemo<StoreLocation | null>(() => {
+    if (!orderData?.storeDTO) return null;
+
+    const lat = orderData.storeDTO.txLatitude
+      ? parseFloat(orderData.storeDTO.txLatitude)
+      : null;
+    const lng = orderData.storeDTO.txLongitude
+      ? parseFloat(orderData.storeDTO.txLongitude)
+      : null;
+
+    if (lat && lng) {
+      return {
+        latitude: lat,
+        longitude: lng,
+        name: orderData.storeDTO.nmStore || 'Store',
+        address: orderData.storeDTO.txAddress || '',
+      };
+    }
+    return null;
+  }, [orderData]);
+
+  // Transform API data to UI format (must be defined before deliveryLocation)
   const orderDetails = useMemo(() => {
     if (!orderData) {
       return null;
@@ -142,16 +207,7 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
     const customerPhone = orderData.deliveryAddress?.txPhone || 'N/A';
 
     // Format customer address
-    const addressParts = [
-      orderData.deliveryAddress?.txAddressLine1,
-      orderData.deliveryAddress?.txAddressLine2,
-      orderData.deliveryAddress?.txLandmark,
-      orderData.deliveryAddress?.txCity,
-      orderData.deliveryAddress?.txState,
-      orderData.deliveryAddress?.txPostalCode,
-    ].filter(Boolean);
-    const customerAddress =
-      addressParts.join(', ') || orderData.txFormattedAddress || 'N/A';
+    const customerAddress = orderData.txFormattedAddress || 'N/A';
 
     // Transform order items
     const items = orderData.orderItems.map(item => ({
@@ -170,6 +226,49 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
       deliveryFee: orderData.nbDeliveryCharge,
     };
   }, [orderData]);
+
+  // Get delivery location from orderData (after orderDetails is defined)
+  const deliveryLocation = useMemo<DeliveryLocation | null>(() => {
+    if (!orderData) return null;
+
+    const lat = orderData.txLatitude
+      ? parseFloat(orderData.txLatitude)
+      : null;
+    const lng = orderData.txLongitude
+      ? parseFloat(orderData.txLongitude)
+      : null;
+
+    if (lat && lng) {
+      return {
+        latitude: lat,
+        longitude: lng,
+        name: orderDetails?.customerName || 'Delivery Location',
+        address: orderDetails?.customerAddress || '',
+      };
+    }
+    return null;
+  }, [orderData, orderDetails]);
+
+  // Map region
+  const mapRegion = useMemo((): Region | null => {
+    if (driverLocation) {
+      return {
+        latitude: driverLocation.latitude,
+        longitude: driverLocation.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.0121,
+      };
+    }
+    if (deliveryLocation) {
+      return {
+        latitude: deliveryLocation.latitude,
+        longitude: deliveryLocation.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.0121,
+      };
+    }
+    return null;
+  }, [driverLocation, deliveryLocation]);
 
   // Get current location
   const getCurrentLocation = useCallback((): Promise<{
@@ -195,7 +294,49 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
     });
   }, []);
 
-  // Send location update to socket
+  // Calculate distance between two points
+  const calculateDistance = useCallback(
+    (
+      point1: {latitude: number; longitude: number},
+      point2: {latitude: number; longitude: number},
+    ): number => {
+      const R = 6371; // Earth's radius in kilometers
+      const dLat = ((point2.latitude - point1.latitude) * Math.PI) / 180;
+      const dLon = ((point2.longitude - point1.longitude) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((point1.latitude * Math.PI) / 180) *
+          Math.cos((point2.latitude * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    },
+    [],
+  );
+
+  // Calculate route
+  const calculateRoute = useCallback(
+    async (
+      start: {latitude: number; longitude: number},
+      end: DeliveryLocation,
+    ) => {
+      try {
+        const routeInfo = await calculateRouteService(start, end);
+        setDistance(routeInfo.distance);
+        setEta(routeInfo.eta);
+        setError(null);
+      } catch (error) {
+        console.error('Route calculation error:', error);
+        if (error instanceof Error && !error.message.includes('API key')) {
+          setError('Failed to calculate route');
+        }
+      }
+    },
+    [],
+  );
+
+  // Send location update to socket (must be defined before startLocationTracking)
   const sendLocationUpdate = useCallback(
     (
       location: {latitude: number; longitude: number},
@@ -273,13 +414,144 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
     [orderId, orderData?.idOrder, user?.idUser, socketService],
   );
 
+  // Start location tracking
+  const startLocationTracking = useCallback(() => {
+    if (locationWatchId.current) {
+      Geolocation.clearWatch(locationWatchId.current);
+    }
+
+    if (!deliveryLocation) return;
+
+    console.log('📍 Starting location tracking for delivery...');
+
+    locationWatchId.current = Geolocation.watchPosition(
+      position => {
+        const now = Date.now();
+        const {latitude, longitude} = position.coords;
+        const newLocation = {latitude, longitude};
+
+        // Send location update to socket every 5 seconds
+        sendLocationUpdate(newLocation, position, 'IN_TRANSIT');
+
+        // Debounce UI location updates (minimum 5 seconds between updates)
+        if (now - lastLocationUpdate.current < 5000) {
+          return;
+        }
+
+        // Only update UI if location changed significantly (more than 100m)
+        if (driverLocation) {
+          const locationDistance = calculateDistance(newLocation, driverLocation);
+          if (locationDistance < 0.1) {
+            return;
+          }
+        }
+
+        lastLocationUpdate.current = now;
+        setDriverLocation(newLocation);
+
+        // Update route if driver location changes significantly
+        if (now - lastRouteUpdate.current > 30000) {
+          const distanceFromDelivery = calculateDistance(
+            newLocation,
+            deliveryLocation,
+          );
+          if (distanceFromDelivery > 0.5) {
+            lastRouteUpdate.current = now;
+            calculateRoute(newLocation, deliveryLocation);
+          }
+        }
+      },
+      err => {
+        console.error('Location tracking error:', err);
+        setError('Location tracking failed');
+      },
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 10,
+        interval: 5000,
+      },
+    );
+  }, [
+    deliveryLocation,
+    driverLocation,
+    calculateDistance,
+    calculateRoute,
+    sendLocationUpdate,
+  ]);
+
+  // Initialize location and route
+  const initializeLocation = useCallback(async () => {
+    if (isInitialized.current || !deliveryLocation) return;
+
+    try {
+      setIsLocationLoading(true);
+      setError(null);
+
+      // Get initial location
+      const currentLocation = await getCurrentLocation();
+      setDriverLocation(currentLocation);
+
+      // Calculate initial route from current location to delivery
+      await calculateRoute(currentLocation, deliveryLocation);
+
+      // Start tracking
+      startLocationTracking();
+
+      isInitialized.current = true;
+      setIsLocationLoading(false);
+    } catch (error) {
+      console.error('Initialization error:', error);
+      setError('Failed to initialize location');
+      setIsLocationLoading(false);
+    }
+  }, [
+    deliveryLocation,
+    getCurrentLocation,
+    calculateRoute,
+    startLocationTracking,
+  ]);
+
+  // Initialize location when orderData and deliveryLocation are available
+  useEffect(() => {
+    if (orderData && deliveryLocation && !isInitialized.current) {
+      initializeLocation();
+    }
+
+    return () => {
+      if (locationWatchId.current) {
+        Geolocation.clearWatch(locationWatchId.current);
+      }
+    };
+  }, [orderData, deliveryLocation, initializeLocation]);
+
+  // Animate map to driver location
+  const animateToDriverLocation = useCallback(() => {
+    if (driverLocation && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: driverLocation.latitude,
+          longitude: driverLocation.longitude,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.0121,
+        },
+        1000,
+      );
+    }
+  }, [driverLocation]);
+
+  // Handle open maps
+  const handleOpenMaps = useCallback(() => {
+    if (deliveryLocation) {
+      openExternalNavigation(deliveryLocation, Platform.OS as 'ios' | 'android');
+    }
+  }, [deliveryLocation]);
+
   const handleBack = useCallback(() => {
     navigation?.goBack();
   }, [navigation]);
 
   const handleOrderDelivered = useCallback(async () => {
     if (!orderData) {
-      Alert.alert('Error', 'Order data not available');
       return;
     }
 
@@ -301,15 +573,8 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
 
       console.log('✅ DELIVERED status sent with current coordinates');
 
-      Alert.alert('Order Delivered', 'Order has been successfully delivered.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate back to dashboard or next order
-            navigation?.navigate('Home');
-          },
-        },
-      ]);
+      // Navigate back to dashboard or next order
+      navigation?.navigate('Home');
     } catch (error) {
       console.error(
         '❌ Error getting current location for DELIVERED status:',
@@ -326,22 +591,13 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
           'DELIVERED',
         );
       }
-      Alert.alert('Order Delivered', 'Order has been successfully delivered.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation?.navigate('DeliveryDashboard');
-          },
-        },
-      ]);
+      navigation?.navigate('DeliveryDashboard');
     }
   }, [orderData, getCurrentLocation, sendLocationUpdate, navigation]);
 
   const handleCallCustomer = useCallback(() => {
-    // Implement call customer functionality
     if (orderDetails?.customerPhone) {
-      console.log('Calling customer:', orderDetails.customerPhone);
-      // You can use Linking.openURL(`tel:${orderDetails.customerPhone}`) here
+      Linking.openURL(`tel:${orderDetails.customerPhone}`);
     }
   }, [orderDetails?.customerPhone]);
 
@@ -454,6 +710,74 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
         </View>
       </View>
 
+      {/* Map View */}
+      {mapRegion && (
+        <View style={styles.mapContainer}>
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={mapRegion}
+            showsUserLocation
+            showsMyLocationButton={false}
+            showsCompass={false}
+            showsScale={false}
+            showsBuildings={true}
+            showsTraffic={false}
+            showsIndoors={false}
+            mapType="standard">
+            
+
+            {/* Store location marker */}
+            {storeLocation && (
+              <Marker
+                coordinate={storeLocation}
+                title={storeLocation.name}
+                description={storeLocation.address}>
+                <View style={styles.storeMarker}>
+                  <Icon name="store" size={20} color="white" />
+                </View>
+              </Marker>
+            )}
+
+            {/* Delivery location marker */}
+            {deliveryLocation && (
+              <Marker
+                coordinate={deliveryLocation}
+                title={deliveryLocation.name}
+                description={deliveryLocation.address}>
+                <View style={styles.deliveryMarker}>
+                  <Icon name="map-marker" size={24} color="white" />
+                </View>
+              </Marker>
+            )}
+
+            {/* Route from store to delivery */}
+            {storeLocation && deliveryLocation && (
+              <MapViewDirections
+                origin={storeLocation}
+                destination={deliveryLocation}
+                apikey={GOOGLE_MAP_API}
+                strokeColor={PRIMARY_GREEN}
+                mode="DRIVING"
+                strokeWidth={4}
+              />
+            )}
+
+            
+          </MapView>
+
+          {/* Map controls */}
+          <View style={styles.mapControls}>
+            <TouchableOpacity
+              style={styles.mapControlButton}
+              onPress={animateToDriverLocation}>
+              <Icon name="crosshairs-gps" size={20} color="#374151" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}>
@@ -465,6 +789,51 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
               <Text style={styles.statusTagText}>Ready to Deliver</Text>
             </View>
             <Text style={styles.orderId}>{orderDetails.orderId}</Text>
+          </View>
+        </View>
+
+         {/* Customer Details */}
+         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Customer Details</Text>
+          <View style={styles.card}>
+            <View style={styles.customerInfo}>
+              <View style={styles.customerIcon}>
+                <Icon name="account" size={24} color={PRIMARY_GREEN} />
+              </View>
+              <View style={styles.customerDetails}>
+                <Text style={styles.customerName}>
+                  {orderDetails.customerName}
+                </Text>
+                <Text style={styles.customerPhone}>
+                  {orderDetails.customerPhone}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.callButton}
+                onPress={handleCallCustomer}>
+                <Icon name="phone" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.addressContainer}>
+              <Icon name="map-marker" size={16} color="#6B7280" />
+              <Text style={styles.address}>{orderDetails.customerAddress}</Text>
+            </View>
+
+            {/* ETA and distance */}
+            {(eta || distance) && (
+              <View style={styles.etaContainer}>
+                <View style={styles.etaItem}>
+                  <Icon name="clock-outline" size={16} color="#6b7280" />
+                  <Text style={styles.etaText}>{eta}</Text>
+                </View>
+                <View style={styles.etaItem}>
+                  <Icon name="map-marker-distance" size={16} color="#6b7280" />
+                  <Text style={styles.etaText}>{distance}</Text>
+                </View>
+              </View>
+            )}
+
+            
           </View>
         </View>
 
@@ -506,34 +875,7 @@ const DropOrderScreen: React.FC<Props> = ({navigation, route}) => {
           </View>
         </View>
 
-        {/* Customer Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer Details</Text>
-          <View style={styles.card}>
-            <View style={styles.customerInfo}>
-              <View style={styles.customerIcon}>
-                <Icon name="account" size={24} color={PRIMARY_GREEN} />
-              </View>
-              <View style={styles.customerDetails}>
-                <Text style={styles.customerName}>
-                  {orderDetails.customerName}
-                </Text>
-                <Text style={styles.customerPhone}>
-                  {orderDetails.customerPhone}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.callButton}
-                onPress={handleCallCustomer}>
-                <Icon name="phone" size={20} color="white" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.addressContainer}>
-              <Icon name="map-marker" size={16} color="#6B7280" />
-              <Text style={styles.address}>{orderDetails.customerAddress}</Text>
-            </View>
-          </View>
-        </View>
+       
       </ScrollView>
 
       {/* Bottom Action Button */}
@@ -583,6 +925,79 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  mapContainer: {
+    height: height * 0.4,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  driverMarker: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: PRIMARY_GREEN,
+    borderWidth: 3,
+    borderColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  driverMarkerInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'white',
+  },
+  storeMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f59e0b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  deliveryMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY_GREEN,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapControls: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    gap: 8,
+  },
+  mapControlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   scrollView: {
     flex: 1,
@@ -808,6 +1223,36 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deliverButtonText: {
+    fontSize: 16,
+    fontFamily: Fonts.SemiBold,
+    color: 'white',
+  },
+  etaContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 12,
+  },
+  etaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  etaText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: Fonts.Medium,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#111827',
+  },
+  mapButtonText: {
     fontSize: 16,
     fontFamily: Fonts.SemiBold,
     color: 'white',

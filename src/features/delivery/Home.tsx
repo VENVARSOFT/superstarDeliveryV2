@@ -1,4 +1,4 @@
-import {StyleSheet, View, FlatList, Image, Alert} from 'react-native';
+import {StyleSheet, View, FlatList, Image} from 'react-native';
 import React, {useEffect, useState, useRef, useCallback} from 'react';
 import Geolocation from '@react-native-community/geolocation';
 import {Colors} from '@utils/Constants';
@@ -56,7 +56,6 @@ const Home = () => {
         console.log('Socket connected successfully!');
       } catch (error) {
         console.error('Failed to connect:', error);
-        Alert.alert('Connection Error', 'Failed to connect to server');
       }
     };
 
@@ -86,19 +85,7 @@ const Home = () => {
     socketService.onOrderAssignmentResponse(data => {
       console.log('📥 Order assignment response:', data);
 
-      if (data.type === 'ASSIGNED') {
-        Alert.alert(
-          '✅ Success',
-          `Order ${data.orderId} has been assigned to you!`,
-        );
-      } else if (data.type === 'DECLINED') {
-        Alert.alert('ℹ️ Info', `Order ${data.orderId} was declined.`);
-      } else if (data.type === 'ALREADY_ASSIGNED') {
-        Alert.alert(
-          '⚠️ Oops',
-          `Order ${data.orderId} was already assigned to another agent.`,
-        );
-      }
+      // Order assignment response handled without alerts
     });
 
     // 5. Listen for order status updates
@@ -127,11 +114,6 @@ const Home = () => {
     if (success) {
       console.log('✅ Accept response sent successfully');
       setOrderRequest(null); // Clear current order request
-    } else {
-      Alert.alert(
-        'Error',
-        'Failed to send response. Please check your connection.',
-      );
     }
   };
 
@@ -147,11 +129,6 @@ const Home = () => {
     if (success) {
       console.log('❌ Reject response sent successfully');
       setOrderRequest(null); // Clear current order request
-    } else {
-      Alert.alert(
-        'Error',
-        'Failed to send response. Please check your connection.',
-      );
     }
   };
 

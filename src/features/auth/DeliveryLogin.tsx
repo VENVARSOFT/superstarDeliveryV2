@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -21,12 +20,10 @@ const DeliveryLogin = () => {
 
   const handleLogin = async () => {
     if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
       return;
     }
 
     if (phone.length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number');
       return;
     }
 
@@ -36,7 +33,7 @@ const DeliveryLogin = () => {
       // For now, navigate to OTP screen
       navigate('Otp', {phone, userType: 'delivery'});
     } catch (error) {
-      Alert.alert('Error', 'Login failed. Please try again.');
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }

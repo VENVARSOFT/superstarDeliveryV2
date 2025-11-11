@@ -1,7 +1,6 @@
 import {
   StyleSheet,
   View,
-  Alert,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
@@ -90,19 +89,6 @@ const RiderHeader = ({onDuty, setOnDuty}: RiderHeaderProps) => {
           // Revert state on error
           setOnDuty(false);
           setIsToggling(false);
-          
-          if (error.code === 1) {
-            // Permission denied
-            Alert.alert(
-              'Permission Denied',
-              'Location permission is required to go on duty.',
-            );
-          } else {
-            Alert.alert(
-              'Location Error',
-              'Unable to get your current location. Please try again.',
-            );
-          }
         },
         {
           enableHighAccuracy: true,

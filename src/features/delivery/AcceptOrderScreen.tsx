@@ -9,20 +9,17 @@ import {
   Platform,
   Animated as RNAnimated,
   Easing,
-  Alert,
 } from 'react-native';
-import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
+import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Fonts} from '@utils/Constants';
 import Geolocation from '@react-native-community/geolocation';
-import {watchLocation, clearLocationWatch} from '@service/directionsService';
+import {watchLocation, clearLocationWatch, calculateRoute} from '@service/directionsService';
 import {useWS, OrderAssignmentRequest} from '@service/WsProvider';
 import {useSelector} from 'react-redux';
 import type {RootState} from '@state/store';
 import { getStoreDetails } from '@service/orderService';
-import { GOOGLE_MAP_API } from '@service/config';
-import MapViewDirections from 'react-native-maps-directions';
 
 Geolocation.setRNConfiguration?.({
   skipPermissionRequests: false,
@@ -56,6 +53,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
     latitude: route?.params?.driverLat ?? 17.442,
     longitude: route?.params?.driverLng ?? 78.391,
   });
+  const [routePoints, setRoutePoints] = useState<Array<{latitude: number; longitude: number}>>([]);
 
   // console.log('driverLocation', driverLocation);
   // console.log('orderData', orderData);
@@ -159,13 +157,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
       message: 'I will deliver this order',
     });
 
-    Alert.alert("this is the success",success.toString());
-
     if (!success) {
-      Alert.alert(
-        'Error',
-        'Failed to send response. Please check your connection.',
-      );
       setAccepted(false);
       return;
     }
@@ -230,11 +222,6 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
 
     if (success) {
       console.log('❌ Reject response sent successfully');
-    } else {
-      Alert.alert(
-        'Error',
-        'Failed to send response. Please check your connection.',
-      );
     }
 
     slideDownOrderUI();
@@ -266,6 +253,38 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
   useEffect(()=>{
     getStoreDetailsFn()
   },[orderData]);
+
+  // Calculate route between store and delivery location
+  useEffect(() => {
+    const calculateStoreToDeliveryRoute = async () => {
+      if (
+        storeDetails?.txLatitude &&
+        storeDetails?.txLongitude &&
+        orderData?.orderInfo?.latitude &&
+        orderData?.orderInfo?.longitude
+      ) {
+        try {
+          const storeLocation = {
+            latitude: parseFloat(storeDetails.txLatitude),
+            longitude: parseFloat(storeDetails.txLongitude),
+          };
+          
+          const deliveryLocation = {
+            latitude: Number(orderData.orderInfo.latitude),
+            longitude: Number(orderData.orderInfo.longitude),
+          };
+
+          const routeInfo = await calculateRoute(storeLocation, deliveryLocation);
+          setRoutePoints(routeInfo.points);
+          console.log('✅ Route calculated from store to delivery:', routeInfo);
+        } catch (error) {
+          console.error('❌ Error calculating route:', error);
+        }
+      }
+    };
+
+    calculateStoreToDeliveryRoute();
+  }, [storeDetails, orderData]);
  
 
   // Listen for order assignment responses
@@ -358,27 +377,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           startWatchingLocation();
         },
         _error => {
-          if (_error.code === 1) {
-            // Permission denied
-            Alert.alert(
-              'Permission Denied',
-              'Location permission is required. Please enable location access in your device settings.',
-              [{text: 'OK'}],
-            );
-          } else if (_error.code === 2) {
-            // Position unavailable
-            Alert.alert(
-              'Location Unavailable',
-              'Unable to get your current location. Please check your location settings.',
-              [{text: 'OK'}],
-            );
-          } else {
-            Alert.alert(
-              'Location Error',
-              `Failed to get initial location: ${_error.message}`,
-              [{text: 'OK'}],
-            );
-          }
+          // Error handling without alert
         },
         {
           enableHighAccuracy: true,
@@ -396,27 +395,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           setDriverLocation(location);
         },
         _error => {
-          if (_error.code === 1) {
-            // Permission denied
-            Alert.alert(
-              'Permission Denied',
-              'Location permission is required. Please enable location access in your device settings.',
-              [{text: 'OK'}],
-            );
-          } else if (_error.code === 2) {
-            // Position unavailable
-            Alert.alert(
-              'Location Unavailable',
-              'Unable to get your current location. Please check your location settings.',
-              [{text: 'OK'}],
-            );
-          } else {
-            Alert.alert(
-              'Location Error',
-              `Failed to watch location: ${_error.message}`,
-              [{text: 'OK'}],
-            );
-          }
+          // Error handling without alert
         },
       );
       setWatchId(id);
@@ -464,19 +443,7 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
           showsIndoorLevelPicker={false}>
           {/* Marker for current driver location */}
 
-          {driverLocation && 
-          <Marker
-          coordinate={{
-            latitude: driverLocation.latitude,
-            longitude: driverLocation.longitude,
-          }}
-          title="My Location"
-          pinColor="Red"
-          anchor={{x: 0.5, y: 0.5}}
-          centerOffset={{x: 0, y: 0}}>
           
-        </Marker>
-          }
           
 
 {orderData?.orderInfo?.latitude && orderData?.orderInfo?.longitude && (
@@ -494,23 +461,15 @@ const AcceptOrderScreen: React.FC<Props> = ({navigation, route}) => {
 )}
 
 
-{/* For showing the destination marker */}
-{driverLocation != undefined && orderData?.orderInfo?.latitude && orderData?.orderInfo?.longitude != undefined ? (
-          <MapViewDirections
-            origin={{
-              latitude: driverLocation.latitude,
-              longitude: driverLocation.longitude,
-            }}
-            destination={{
-              latitude: Number(orderData?.orderInfo?.latitude),
-              longitude: Number(orderData?.orderInfo?.longitude),
-            }}
-            apikey={GOOGLE_MAP_API}
+{/* Route polyline from store to delivery location */}
+{routePoints.length > 1 && (
+          <Polyline
+            coordinates={routePoints}
             strokeColor={PRIMARY_GREEN}
-            mode='DRIVING'
             strokeWidth={4}
+            lineDashPattern={[8, 6]}
           />
-        ) : null} 
+        )} 
 
 
 

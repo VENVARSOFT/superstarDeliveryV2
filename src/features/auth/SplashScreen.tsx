@@ -1,4 +1,4 @@
-import {StyleSheet, Alert, Image} from 'react-native';
+import {StyleSheet, Image} from 'react-native';
 import React, {FC, useEffect} from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import {screenHeight, screenWidth} from '@utils/Scaling';
@@ -32,9 +32,7 @@ const SplashScreen: FC = () => {
         if (validToken) {
           // If user data exists in Redux, navigate to appropriate dashboard based on user type
           if (user) {
-            Alert.alert('user', user);
             const userType = user as any;
-            Alert.alert('userType', userType);
             if (userType) {
               resetAndNavigate('Home');
             } else {
@@ -101,10 +99,6 @@ const SplashScreen: FC = () => {
         }, 500);
       } catch (error) {
         console.warn('Location permission error:', error);
-        Alert.alert(
-          'Location Permission',
-          'Sorry we need location service to give you better shopping experience',
-        );
         // Still try to navigate even if location fails
         setTimeout(async () => {
           await tokenCheck();

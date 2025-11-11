@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
-  Alert,
   Dimensions,
   Animated,
 } from 'react-native';
@@ -171,11 +170,9 @@ const Profile = () => {
           } catch {}
         }
         setEditVisible(false);
-      } else {
-        Alert.alert('Update failed', resp?.error || 'Please try again');
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Something went wrong');
+      console.error('Error updating profile:', e);
     } finally {
       setSaving(false);
     }

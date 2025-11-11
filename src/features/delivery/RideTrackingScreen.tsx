@@ -4,7 +4,6 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
@@ -95,7 +94,6 @@ const RideTrackingScreen = () => {
         setRideStatus(newStatus);
 
         if (newStatus) {
-          Alert.alert('Ride Completed', 'Thank you for riding with us!');
           // Call test socket API when delivery is completed
           callTestSocketAPI();
         }
@@ -123,7 +121,6 @@ const RideTrackingScreen = () => {
   // Handle errors
   const handleError = useCallback((error: any) => {
     console.error('Socket error:', error);
-    Alert.alert('Error', error.message || 'An error occurred');
   }, []);
 
   const getStatusColor = () => {

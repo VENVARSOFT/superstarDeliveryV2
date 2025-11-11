@@ -1,4 +1,4 @@
-import {StyleSheet, Text, View, Alert} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import React, {FC} from 'react';
 import {appAxios} from '@service/apiInterceptors';
 import {resetAndNavigate} from '@utils/NavigationUtils';
@@ -32,7 +32,6 @@ const RiderRideItem: FC<{item: RideItem; removeIt: () => void}> = ({
         params: {rideId: item._id},
       });
     } catch (error: any) {
-      Alert.alert('Oh! Dang there was an error');
       console.log(error);
     }
   };

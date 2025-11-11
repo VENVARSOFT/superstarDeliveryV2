@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673404843173",
+    "project_id": "superstardeliverymobile-dev",
+    "storage_bucket": "superstardeliverymobile-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673404843173:android:990b4ffd327666978d494c",
+        "android_client_info": {
+          "package_name": "com.golisoda_delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7vkOqZetR3UhZTtUaXG_CGAFFQTRR0Xo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

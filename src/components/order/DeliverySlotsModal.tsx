@@ -7,7 +7,6 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import CustomText from '@components/ui/CustomText';
 import {Fonts, Colors} from '@utils/Constants';
@@ -45,12 +44,9 @@ const DeliverySlotsModal: React.FC<DeliverySlotsModalProps> = ({
 
       if (response && response.success) {
         setSlotsData(response.data);
-      } else {
-        Alert.alert('Error', 'Failed to fetch delivery slots');
       }
     } catch (error) {
       console.error('Error fetching slots:', error);
-      Alert.alert('Error', 'Failed to fetch delivery slots');
     } finally {
       setLoading(false);
     }
